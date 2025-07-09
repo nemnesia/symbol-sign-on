@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbol Transaction Generator Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #005999;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+        }
+        .result h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .transaction-hex {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .error {
+            background-color: #ffe7e7;
+            border: 1px solid #ffb3b3;
+            color: #d00;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .success {
+            background-color: #e7ffe7;
+            border: 1px solid #b3ffb3;
+            color: #080;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .network-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .network-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .network-card.selected {
+            border-color: #007acc;
+            background-color: #e7f3ff;
+        }
+        .network-card h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .network-card p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Symbol Transaction Generator Test</h1>
+        
+        <div class="info">
+            <strong>このテストページについて:</strong><br>
+            ビルドされたsymbol-sign-tx.jsを使用してSymbolトランザクションを生成し、生成されたトランザクションの形式を確認できます。
+        </div>
+
+        <form id="transactionForm">
+            <div class="form-group">
+                <label for="network">ネットワーク:</label>
+                <div class="network-info">
+                    <div class="network-card" data-network="104">
+                        <h4>Mainnet</h4>
+                        <p>Network ID: 104 (0x68)</p>
+                        <p>本番ネットワーク</p>
+                    </div>
+                    <div class="network-card selected" data-network="152">
+                        <h4>Testnet</h4>
+                        <p>Network ID: 152 (0x98)</p>
+                        <p>テスト用ネットワーク</p>
+                    </div>
+                </div>
+                <input type="hidden" id="network" value="152">
+            </div>
+
+            <div class="form-group">
+                <label for="message">メッセージ:</label>
+                <textarea id="message" rows="4" placeholder="送信するメッセージを入力してください">Hello Symbol!</textarea>
+            </div>
+
+            <button type="submit">トランザクション生成</button>
+            <button type="button" id="clearResult">結果をクリア</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>生成されたトランザクション</h3>
+            <div id="transactionInfo"></div>
+            <div class="transaction-hex" id="transactionHex"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createSingTx } from './dist/symbol-sign-tx.js';
+
+        // ネットワーク選択の処理
+        document.querySelectorAll('.network-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.network-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                document.getElementById('network').value = card.dataset.network;
+            });
+        });
+
+        // フォーム送信の処理
+        document.getElementById('transactionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const networkNumber = parseInt(document.getElementById('network').value);
+            const message = document.getElementById('message').value;
+            
+            if (!message.trim()) {
+                showError('メッセージを入力してください。');
+                return;
+            }
+
+            try {
+                // トランザクション生成
+                const transaction = createSingTx(networkNumber, message);
+                
+                // 結果を表示
+                showResult(transaction, networkNumber, message);
+                
+                showSuccess('トランザクションが正常に生成されました！');
+                
+            } catch (error) {
+                console.error('Transaction generation error:', error);
+                showError('トランザクション生成中にエラーが発生しました: ' + error.message);
+            }
+        });
+
+        // 結果クリアボタンの処理
+        document.getElementById('clearResult').addEventListener('click', () => {
+            document.getElementById('result').style.display = 'none';
+            clearMessages();
+        });
+
+        function showResult(transaction, networkNumber, message) {
+            const resultDiv = document.getElementById('result');
+            const transactionInfo = document.getElementById('transactionInfo');
+            const transactionHex = document.getElementById('transactionHex');
+            
+            // トランザクション情報を表示
+            const networkName = networkNumber === 104 ? 'Mainnet' : 'Testnet';
+            const transactionSize = transaction.length / 2;
+            const messageBytes = new TextEncoder().encode(message).length;
+            
+            transactionInfo.innerHTML = `
+                <p><strong>ネットワーク:</strong> ${networkName} (${networkNumber})</p>
+                <p><strong>メッセージ:</strong> "${message}"</p>
+                <p><strong>メッセージサイズ:</strong> ${messageBytes} バイト</p>
+                <p><strong>トランザクションサイズ:</strong> ${transactionSize} バイト</p>
+                <p><strong>トランザクションタイプ:</strong> Transfer (0x5441)</p>
+                <p><strong>受信者アドレス:</strong> 982F0A4E106CBC9224DF7AC5E2C6A9D5252E70CB6568B79A</p>
+            `;
+            
+            // 16進数トランザクションを整形して表示
+            const formattedHex = formatHexString(transaction);
+            transactionHex.textContent = formattedHex;
+            
+            resultDiv.style.display = 'block';
+        }
+
+        function formatHexString(hex) {
+            // 16進数文字列を32文字ずつに分割して表示
+            const chunks = [];
+            for (let i = 0; i < hex.length; i += 64) {
+                chunks.push(hex.substr(i, 64));
+            }
+            return chunks.join('\n');
+        }
+
+        function showError(message) {
+            clearMessages();
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.container').appendChild(errorDiv);
+        }
+
+        function showSuccess(message) {
+            clearMessages();
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.querySelector('.container').appendChild(successDiv);
+        }
+
+        function clearMessages() {
+            const messages = document.querySelectorAll('.error, .success');
+            messages.forEach(msg => msg.remove());
+        }
+
+        // ページロード時のテスト
+        window.addEventListener('load', () => {
+            try {
+                // 関数が正常にインポートできるかテスト
+                if (typeof createSingTx === 'function') {
+                    console.log('✅ createSingTx function successfully imported');
+                    
+                    // 簡単なテスト実行
+                    const testTx = createSingTx(152, 'test');
+                    console.log('✅ Test transaction generated:', testTx.substring(0, 50) + '...');
+                } else {
+                    throw new Error('createSingTx function not found');
+                }
+            } catch (error) {
+                console.error('❌ Import test failed:', error);
+                showError('ライブラリの読み込みに失敗しました: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

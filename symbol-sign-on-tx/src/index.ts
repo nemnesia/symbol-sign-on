@@ -64,8 +64,3 @@ export const createSingTx = (networkNumber: number, message: string) => {
 
   return transaction
 }
-
-
-console.log(createSingTx(104, 'Hello, Symbol!'));
-console.log(createSingTx(152, 'Hello, Symbol!'));
-// Example output: 000000A

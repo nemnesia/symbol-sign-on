@@ -4,9 +4,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "yarn rollup -c",
-    "start": "yarn tsx src/index.ts",
     "test-server": "node test-page/test-server.js",
-    "test": "yarn build && yarn test-server",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -32,5 +30,10 @@
   "dependencies": {
     "symbol-sdk": "^3.2.3",
     "tslib": "^2.8.1"
+  },
+  "volta": {
+    "node": "22.17.0",
+    "npm": "11.4.2",
+    "yarn": "4.9.2"
   }
 }

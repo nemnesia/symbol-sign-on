@@ -1,3 +1,5 @@
+import { base32ToHexAddress, publicKeyToAddress } from './address'
+
 export const createSingTx = (networkNumber: number, message: string) => {
   const size = (() => {
     const len = 160 + message.length
@@ -23,7 +25,9 @@ export const createSingTx = (networkNumber: number, message: string) => {
   const fee = '0000000000000000'
   const deadline = '0000000000000000'
 
-  const recipientAddress = '000000000000000000000000000000000000000000000000'
+  const recipientAddress = base32ToHexAddress(
+    publicKeyToAddress(networkNumber, signerPublicKey),
+  )
   const messageSize = (() => {
     const len = message.length
     const buf = new Uint8Array(2)

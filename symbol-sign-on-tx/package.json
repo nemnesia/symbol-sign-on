@@ -28,6 +28,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
     "symbol-sdk": "^3.2.3",
     "tslib": "^2.8.1"
   },

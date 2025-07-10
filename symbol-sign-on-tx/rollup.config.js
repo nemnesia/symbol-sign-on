@@ -9,8 +9,8 @@ import nodePolyfills from 'rollup-plugin-polyfill-node';
 export default {
   input: "src/index.ts",
   output: {
-    file: "dist/symbol-sign-tx.js",
-    format: "esm",
+    file: "dist/symbol-sign-tx.mjs",
+    format: "es",
     sourcemap: true,
   },
   plugins: [
@@ -44,13 +44,16 @@ export default {
         drop_debugger: true,
         drop_console: false,
         pure_funcs: [],
-        // さらなる最適化
-        passes: 2,
-        pure_getters: true,
-        unsafe: true,
-        unsafe_comps: true,
-        unsafe_math: true,
-        unsafe_methods: true,
+        // BigInt関連の問題を避けるため最適化を控えめに
+        passes: 1,
+        pure_getters: false,
+        unsafe: false,
+        unsafe_comps: false,
+        unsafe_math: false,
+        unsafe_methods: false,
+        // BigInt値の変換を避ける
+        evaluate: false,
+        reduce_vars: false,
       },
       mangle: {
         toplevel: true,
@@ -58,6 +61,8 @@ export default {
           regex: /^_/,
         },
       },
+      // BigInt関連のエラーを避けるため
+      ecma: 2020,
     }),
     // バンドルサイズの分析レポートを生成
     visualizer({

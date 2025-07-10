@@ -63,3 +63,4 @@ ssl/*.crt
 # MongoDB dumps
 *.bson
 *.json.gz
+mongodb_data

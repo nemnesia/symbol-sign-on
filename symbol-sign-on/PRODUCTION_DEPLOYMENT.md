@@ -2,7 +2,7 @@
 
 ## 概要
 
-このガイドでは、Symbol Sign Auth APIを本番環境にDockerを使ってデプロイする方法を説明します。
+このガイドでは、Symbol Sign On APIを本番環境にDockerを使ってデプロイする方法を説明します。
 
 ## 前提条件
 

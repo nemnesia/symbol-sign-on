@@ -9,7 +9,7 @@
     // Symbol SDKを動的にインポート
     let sdk, sdkCore, symbolSdk;
     let sdkLoaded = false;
-    
+
     import('https://www.unpkg.com/symbol-sdk@3.2.3/dist/bundle.web.js')
       .then(loadedSdk => {
         sdk = loadedSdk;
@@ -17,17 +17,17 @@
         symbolSdk = loadedSdk.symbol;
         sdkLoaded = true;
         console.log('Symbol SDK loaded successfully');
-        
+
         // SDKが読み込まれたことを他のスクリプトに通知
-        document.dispatchEvent(new CustomEvent('sdkLoaded', { 
-          detail: { sdk, sdkCore, symbolSdk } 
+        document.dispatchEvent(new CustomEvent('sdkLoaded', {
+          detail: { sdk, sdkCore, symbolSdk }
         }));
       })
       .catch(error => {
         console.error('Failed to load Symbol SDK:', error);
         document.dispatchEvent(new CustomEvent('sdkError', { detail: error }));
       });
-      
+
     // SDKアクセス用のAPI
     document.addEventListener('sdkRequest', (event) => {
       const { callback } = event.detail;
@@ -38,7 +38,7 @@
       }
     });
   </script>
-  <title>Symbol Sign Authorization</title>
+  <title>Symbol Sign On Authorization</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -168,19 +168,19 @@
 
   <script>
     let currentSDK = null;
-    
+
     // SDKの読み込み状態を監視
     document.addEventListener('sdkLoaded', (event) => {
       currentSDK = event.detail;
-      document.getElementById('sdk-status').innerHTML = 
+      document.getElementById('sdk-status').innerHTML =
         '<div style="color: #28a745;">Symbol SDK読み込み完了</div>';
     });
-    
+
     document.addEventListener('sdkError', (event) => {
-      document.getElementById('sdk-status').innerHTML = 
+      document.getElementById('sdk-status').innerHTML =
         '<div class="error">Symbol SDK読み込みエラー: ' + event.detail.message + '</div>';
     });
-    
+
     // SDKへのアクセス関数
     function getSDK() {
       return new Promise((resolve) => {
@@ -199,17 +199,17 @@
     async function createTransaction(userPublicKeyString) {
       try {
         const { symbolSdk } = await getSDK();
-        
+
         if (!symbolSdk) {
           throw new Error('Symbol SDK not available');
         }
-        
+
         // ダミーアカウント（無効な公開鍵）
         const invalidPublicKey = new symbolSdk.PublicKey(
           "0000000000000000000000000000000000000000000000000000000000000000"
         );
         const dummyAccount = symbolSdk.facade.createPublicAccount(invalidPublicKey);
-        
+
         // ユーザーアカウント
         const userAccount = symbolSdk.facade.createPublicAccount(
           new symbolSdk.PublicKey(userPublicKeyString)
@@ -217,7 +217,7 @@
 
         // メッセージ
         const message = '\0{{CHALLENGE}}'
-        
+
         // トランザクション生成
         const transferDescriptor = new descriptors.TransferTransactionV1Descriptor(
           dummyAccount.address,
@@ -245,12 +245,12 @@
     async function authorize() {
       try {
         const { symbolSdk, loaded } = await getSDK();
-        
+
         if (!loaded) {
           alert('Symbol SDK is still loading. Please wait a moment and try again.');
           return;
         }
-        
+
         if (isMobileDevice()) {
           // スマートフォンの場合はSSSモジュールをリクエスト
           console.log('スマートフォンデバイスを検出しました。aLiceをリクエストします。');

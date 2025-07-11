@@ -1,4 +1,4 @@
-# Symbol Sign Auth
+# Symbol Sign On
 
 SymbolブロックチェーンのデジタルDSA署名を使用したOAuth2認証システム
 

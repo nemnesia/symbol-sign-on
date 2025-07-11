@@ -161,13 +161,13 @@ GET /health
 
 ```bash
 # MongoDB接続状態確認
-mongosh mongodb://localhost:27017/symbol_sign_auth
+mongosh mongodb://localhost:27017/symbol_sign_on
 
 # アプリケーションログの確認
 tail -f logs/app-current.log
 
 # 開発用データベースのリセット
-mongosh mongodb://localhost:27017/symbol_sign_auth --eval "db.dropDatabase()"
+mongosh mongodb://localhost:27017/symbol_sign_on --eval "db.dropDatabase()"
 
 # TypeScriptの型チェック
 npx tsc --noEmit
@@ -188,7 +188,7 @@ sudo systemctl status mongod
 sudo systemctl restart mongod
 
 # MongoDB接続テスト
-mongosh mongodb://localhost:27017/symbol_sign_auth
+mongosh mongodb://localhost:27017/symbol_sign_on
 ```
 
 ### ポート競合エラー

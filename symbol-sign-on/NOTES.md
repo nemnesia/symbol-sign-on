@@ -1,4 +1,4 @@
-# Symbol Sign Auth プロジェクト構成メモ
+# Symbol Sign On プロジェクト構成メモ
 
 ## ファイル構成
 

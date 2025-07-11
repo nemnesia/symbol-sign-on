@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Symbol Login Demo</title>
+  <style>
+    .error-message {
+      color: red;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid red;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Symbolでログイン</h1>
+
+  <!-- ポップアップパターン -->
+  <button id="popup-login">ポップアップでログイン</button>
+
+  <!-- エラーメッセージ表示エリア -->
+  <div id="error-message" class="error-message"></div>
+
+  <script>
+    // エラーメッセージを表示する関数
+    function showError(error, description) {
+      const errorElement = document.getElementById('error-message');
+      errorElement.textContent = `${error}: ${description}`;
+      errorElement.style.display = 'block';
+    }
+
+    // ポップアップウィンドウからのメッセージを受け取る
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'login_error') {
+        // ポップアップから送られてきたエラーを表示
+        showError(event.data.error, event.data.errorDescription);
+      }
+    });
+
+    // ポップアップパターンの処理
+    document.getElementById('popup-login').addEventListener('click', function () {
+      // エラーメッセージをクリア
+      document.getElementById('error-message').style.display = 'none';
+
+      const popupWidth = 500;
+      const popupHeight = 600;
+
+      // 現在のウィンドウを基準に中央位置を計算
+      const left = Math.max(0, window.screenX + (window.innerWidth - popupWidth) / 2);
+      const top = Math.max(0, window.screenY + (window.innerHeight - popupHeight) / 2);
+
+      window.open(
+        '/login.html?client_id=demo_app&redirect_uri=http://localhost:3510/login-demo.html',
+        'SymbolLoginPopup',
+        `width=${popupWidth},height=${popupHeight},top=${top},left=${left}`
+      );
+    });
+  </script>
+</body>
+
+</html>

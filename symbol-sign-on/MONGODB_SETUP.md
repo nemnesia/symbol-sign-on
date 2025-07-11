@@ -28,7 +28,7 @@ docker-compose -f docker-compose.dev.yml down -v
 docker exec -it symbol-sign-on-mongodb mongosh -u admin -p password
 
 # データベース確認
-use symbol_sign_auth
+use symbol_sign_on
 show collections
 ```
 
@@ -38,7 +38,7 @@ show collections
 - **ポート**: 27017
 - **ユーザー**: admin
 - **パスワード**: password
-- **データベース**: symbol_sign_auth
+- **データベース**: symbol_sign_on
 
 ### Mongo Express (管理UI)
 - **URL**: http://localhost:8081
@@ -50,7 +50,7 @@ show collections
 
 ```env
 # MongoDB設定
-MONGODB_URI=mongodb://admin:password@localhost:27017/symbol_sign_auth?authSource=admin
+MONGODB_URI=mongodb://admin:password@localhost:27017/symbol_sign_on?authSource=admin
 ```
 
 ## コレクション構成

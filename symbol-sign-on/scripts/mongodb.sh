@@ -41,7 +41,7 @@ case "$1" in
         ;;
     "shell")
         echo "Connecting to MongoDB shell..."
-        docker exec -it symbol-sign-on-mongodb mongosh -u admin -p password symbol_sign_auth
+        docker exec -it symbol-sign-on-mongodb mongosh -u admin -p password symbol_sign_on
         ;;
     *)
         echo "Usage: $0 {start|stop|restart|logs|reset|status|shell}"

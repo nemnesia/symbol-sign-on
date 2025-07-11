@@ -1,57 +1,84 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { AuthCodes, Challenges, Tokens } from '../db/database.js'
+import { AuthCodes, Challenges, Tokens, Clients } from '../db/database.js'
 import logger from '../utils/logger.js'
-import { renderTemplate } from '../utils/template.js'
+import { utils } from 'symbol-sdk'
 import {
-  descriptors,
   models,
   SymbolFacade,
   SymbolTransactionFactory,
 } from 'symbol-sdk/symbol'
-import { PublicKey, utils } from 'symbol-sdk'
 
 const router = Router()
 
 // GET /oauth/authorize
 router.get('/authorize', async (req, res) => {
   try {
-    const { response_type, client_id, redirect_uri, scope, state } = req.query
+    const { response_type, client_id, redirect_uri } = req.query
+    logger.debug(`/oauth/authorize query: ${JSON.stringify(req.query)}`)
 
     // OAuth2必須パラメータの検証
     if (!response_type || !client_id || !redirect_uri) {
-      const errorUrl = new URL(redirect_uri as string)
-      errorUrl.searchParams.set('error', 'invalid_request')
-      errorUrl.searchParams.set(
-        'error_description',
-        'Missing required parameters: response_type, client_id, redirect_uri',
+      logger.error(
+        `/oauth/authorize missing required parameters: response_type=${response_type}, client_id=${client_id}, redirect_uri=${redirect_uri}`,
       )
-      if (state) errorUrl.searchParams.set('state', state as string)
-      return res.redirect(errorUrl.toString())
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description:
+          'Missing required parameters: response_type, client_id, redirect_uri',
+      })
     }
 
     // response_typeは'code'のみサポート
     if (response_type !== 'code') {
+      logger.error(
+        `/oauth/authorize unsupported response_type: ${response_type}`,
+      )
       return res.status(400).json({
         error: 'unsupported_response_type',
         error_description: "Only 'code' response_type is supported",
       })
     }
 
-    // redirect_uriの検証（実際の実装では登録済みURIとの照合が必要）
+    // 登録済みのredirect_uriを取得して照合
+    let registeredRedirectUri
     try {
-      new URL(redirect_uri as string)
+      const client = await Clients.findOne({
+        client_id: client_id as string,
+      })
+      if (!client || !client.trusted_redirect_uris) {
+        logger.error(
+          `/oauth/authorize client not found or has no trusted URIs: client_id=${client_id}`,
+        )
+        return res.status(400).json({
+          error: 'unauthorized_client',
+          error_description:
+            'Client ID is not registered or has no trusted URIs',
+        })
+      }
+      registeredRedirectUri = client.trusted_redirect_uris
     } catch {
+      logger.error(
+        `/oauth/authorize database error while fetching client: client_id=${client_id}`,
+      )
+      return res.status(500).json({
+        error: 'server_error',
+        error_description: 'Failed to fetch client data',
+      })
+    }
+
+    if (!registeredRedirectUri.includes(redirect_uri as string)) {
+      logger.error(
+        `/oauth/authorize redirect_uri does not match any trusted URIs: ${redirect_uri}`,
+      )
       return res.status(400).json({
         error: 'invalid_request',
-        error_description: 'Invalid redirect_uri format',
+        error_description: 'redirect_uri does not match any trusted URIs',
       })
     }
 
     const challenge = uuidv4()
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5分後
-
-    const facade = new SymbolFacade(process.env.SYMBOL_NETWORK!)
 
     // チャレンジ情報をDBへ保存（OAuth2パラメータも含める）
     try {
@@ -59,69 +86,31 @@ router.get('/authorize', async (req, res) => {
         challenge,
         client_id: client_id as string,
         redirect_uri: redirect_uri as string,
-        scope: (scope as string) || null,
-        state: state as string | null,
         expires_at: expiresAt,
         createdAt: new Date(),
       })
-    } catch (dbError) {
-      logger.error(`Database insertion failed: ${(dbError as Error).message}`)
-      // DBエラーの場合はOAuth2エラーレスポンス
-      const errorUrl = new URL(redirect_uri as string)
-      errorUrl.searchParams.set('error', 'server_error')
-      errorUrl.searchParams.set('error_description', 'Database error')
-      if (state) errorUrl.searchParams.set('state', state as string)
-      return res.redirect(errorUrl.toString())
+    } catch {
+      logger.error(
+        `/oauth/authorize database error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}`,
+      )
+      return res.status(500).json({
+        error: 'server_error',
+        error_description: 'Database error',
+      })
     }
 
-    // Symbolトランザクション
-    // ダミーアカウント（無効な公開鍵）
-    const invalidPublicKey = new PublicKey(
-      '0000000000000000000000000000000000000000000000000000000000000000',
-    )
-    const dummyAccount = facade.createPublicAccount(invalidPublicKey)
-    const transferDescriptor = new descriptors.TransferTransactionV1Descriptor(
-      dummyAccount.address,
-      [],
-      '\0{{challenge}}',
-    )
-    const transferTx = facade.createTransactionFromTypedDescriptor(
-      transferDescriptor,
-      dummyAccount.publicKey,
-      0,
-      0,
-    )
-    const _challengeTx = utils.uint8ToHex(transferTx.serialize())
-
-    // OAuth2準拠のレスポンス: 認可画面を返す
-    const authorizationPage = renderTemplate('authorization.html', {
-      CLIENT_ID: client_id as string,
-      REDIRECT_URI: redirect_uri as string,
-      SCOPE_INFO: scope ? `<br><strong>スコープ:</strong> ${scope}` : '',
-      CHALLENGE: challenge,
-      STATE_PARAM: state
-        ? `<input type="hidden" name="state" value="${state}">`
-        : '',
+    // OAuth2準拠のJSONレスポンスを返す
+    res.json({
+      client_id: client_id,
+      redirect_uri: redirect_uri,
+      challenge: challenge,
     })
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8')
-    res.send(authorizationPage)
   } catch (err) {
     logger.error(`/oauth/authorize error: ${(err as Error).message}`)
-    // OAuth2エラーの場合はredirect_uriにエラーを返すべき
-    if (req.query.redirect_uri) {
-      try {
-        const errorUrl = new URL(req.query.redirect_uri as string)
-        errorUrl.searchParams.set('error', 'server_error')
-        errorUrl.searchParams.set('error_description', 'Internal server error')
-        if (req.query.state)
-          errorUrl.searchParams.set('state', req.query.state as string)
-        return res.redirect(errorUrl.toString())
-      } catch {
-        // redirect_uriが無効な場合は通常のエラーレスポンス
-      }
-    }
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({
+      error: 'server_error',
+      error_description: 'Internal server error',
+    })
   }
 })
 
@@ -226,9 +215,6 @@ router.put('/verify-signature', async (req, res) => {
       try {
         const redirectUrl = new URL(challengeDoc.redirect_uri)
         redirectUrl.searchParams.set('code', code)
-        if (challengeDoc.state) {
-          redirectUrl.searchParams.set('state', challengeDoc.state)
-        }
 
         // ポップアップからのリクエストの場合はpostMessageで親ウィンドウに結果を送信
         const referer = req.get('Referer')
@@ -257,7 +243,6 @@ router.put('/verify-signature', async (req, res) => {
         window.opener.postMessage({
           type: 'oauth_success',
           code: '${code}',
-          state: '${challengeDoc.state || ''}',
           redirect_uri: '${challengeDoc.redirect_uri}',
           method: 'POST'  // POSTメソッドを明示
         }, '${new URL(challengeDoc.redirect_uri).origin}');

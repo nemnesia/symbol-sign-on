@@ -1,5 +1,5 @@
 import { MongoClient, Db, Collection } from 'mongodb';
-import { ChallengeDocument, AuthCodeDocument, TokenDocument } from '../types/auth.js';
+import { ChallengeDocument, AuthCodeDocument, TokenDocument, ClientDocument } from '../types/auth.js';
 
 let client: MongoClient;
 let db: Db;
@@ -8,6 +8,7 @@ let db: Db;
 export let Challenges: Collection<ChallengeDocument>;
 export let AuthCodes: Collection<AuthCodeDocument>;
 export let Tokens: Collection<TokenDocument>;
+export let Clients: Collection<ClientDocument>;
 
 /**
  * MongoDBに接続し、各コレクションを初期化
@@ -28,6 +29,7 @@ export async function connectToMongo() {
   Challenges = db.collection('challenges');
   AuthCodes = db.collection('auth_codes');
   Tokens = db.collection('tokens');
+  Clients = db.collection('clients');
 
   // TTLインデックス（challengeは5分で無効化）
   try {
@@ -48,6 +50,13 @@ export async function connectToMongo() {
     await Tokens.createIndex({ createdAt: 1 }, { expireAfterSeconds: 86400 });
   } catch (error) {
     console.warn('Failed to create TTL index for tokens:', (error as Error).message);
+  }
+
+  // Clients コレクションのインデックス作成
+  try {
+    await Clients.createIndex({ client_id: 1 }, { unique: true });
+  } catch (error) {
+    console.warn('Failed to create index for clients:', (error as Error).message);
   }
 }
 

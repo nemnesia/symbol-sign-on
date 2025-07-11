@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login</title>
   <script>
     // SSSModuleの定義
     !function (e, t) { "object" == typeof exports && "undefined" != typeof module ? t(exports) : "function" == typeof define && define.amd ? define(["exports"], t) : t((e = "undefined" != typeof globalThis ? globalThis : e || self).SSSModule = {}) }(this, function (e) { "use strict"; e.getActiveAccountToken = (e, t, i) => { if ("string" == typeof e) return window.SSS.getActiveAccountToken(e, t, i); { const n = e.publicKey; return e.address.pretty().charAt(0) !== window.SSS.activeAddress.charAt(0) ? new Promise((e, t) => { t("Incorrect network type") }) : window.SSS.getActiveAccountToken(n, t, i) } }, e.getActiveAddress = () => window.SSS.activeAddress, e.getActiveName = () => window.SSS.activeName, e.getActiveNetworkType = () => window.SSS.activeNetworkType, e.getActivePublicKey = () => window.SSS.activePublicKey, e.isAllowedSSS = () => !!window.SSS, e.requestSSS = () => window.requestSSS(), e.requestSign = () => window.SSS.requestSign(), e.requestSignCosignatureTransaction = () => window.SSS.requestSignCosignatureTransaction(), e.requestSignEncription = () => window.SSS.requestSignEncription(), e.requestSignWithCosignatories = e => window.SSS.requestSignWithCosignatories(e), e.setMessage = (e, t) => { window.SSS.setMessage(e, t) }, e.setTransaction = e => window.SSS.setTransaction(e), e.setTransactionByPayload = e => window.SSS.setTransactionByPayload(e) });
@@ -15,139 +16,99 @@
     // グローバルスコープでアクセス可能にする
     window.SymbolSignTx = { createSingTx: at };
   </script>
-  <title>Symbol Sign On Authorization</title>
+  <!-- スタイルは必要に応じてここに追加 -->
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 600px;
-      margin: 50px auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }
-
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    h2 {
-      color: #333;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .app-info {
-      background: #e7f3ff;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 20px 0;
-      border-left: 4px solid #007bff;
-    }
-
-    .challenge-info {
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 8px;
-      margin: 20px 0;
-      border: 1px solid #ddd;
-    }
-
-    button {
-      background: #007bff;
-      color: white;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      margin: 10px 5px;
-      min-width: 120px;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-
-    .deny-btn {
-      background: #dc3545;
-    }
-
-    .deny-btn:hover {
-      background: #c82333;
-    }
-
-    .button-group {
-      text-align: center;
-      margin-top: 30px;
-    }
-
-    .challenge-id {
-      font-family: monospace;
-      background: #f8f9fa;
-      padding: 10px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-      word-break: break-all;
-    }
-
-    .info-text {
-      color: #666;
-      font-size: 14px;
-      margin: 10px 0;
-    }
   </style>
 </head>
 
 <body>
-  <div class="container">
-    <h2>認可リクエスト</h2>
+  <h1>ログイン画面</h1>
+  <p>Client ID: <span id="client-id"></span></p>
+  <p>Redirect URI: <span id="redirect-uri"></span></p>
 
-    <div class="app-info">
-      <strong>アプリケーション:</strong> {{CLIENT_ID}}<br>
-      <strong>リダイレクト URI:</strong> {{REDIRECT_URI}}
-      {{SCOPE_INFO}}
-    </div>
-
-    <p>上記のアプリケーションがあなたのSymbolアカウントへのアクセスを要求しています。</p>
-
-    <div class="challenge-info">
-      <strong>チャレンジ ID:</strong>
-      <div class="challenge-id">{{CHALLENGE}}</div>
-      <div class="info-text">
-        ※ この認可を完了するには、別途 /oauth/verify-signature エンドポイントで
-        署名検証を行う必要があります。
-      </div>
-    </div>
-
-    <div class="button-group">
-      <button onclick="authorize()">認可する</button>
-      <button class="deny-btn" onclick="deny()">拒否する</button>
-    </div>
-
-    <div id="result"></div>
-  </div>
+  <button id="symbol-auth-btn" class="auth-button">Symbolで認証</button>
 
   <script>
+    // URLパラメータから値を取得
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientId = urlParams.get('client_id');
+    const redirectUri = urlParams.get('redirect_uri');
+
+    // HTMLに値を表示
+    document.getElementById('client-id').textContent = clientId || '未指定';
+    document.getElementById('redirect-uri').textContent = redirectUri || '未指定';
+
+    // エラーを親ウィンドウに通知する関数
+    function notifyParentAndClose(error, description) {
+      if (window.opener && !window.opener.closed) {
+        // 親ウィンドウにエラーメッセージを送信
+        window.opener.postMessage({
+          type: 'login_error',
+          error: error,
+          errorDescription: description
+        }, '*');
+
+        // ポップアップを閉じる
+        window.close();
+      }
+    }
+
+    // /oauth/authorize からチャレンジ取得
+    if (clientId && redirectUri) {
+      fetch(`/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.error) {
+            // エラーを親ウィンドウに通知してポップアップを閉じる
+            notifyParentAndClose(data.error, data.error_description);
+          } else {
+            // チャレンジを表示（例: コンソールに出力）
+            console.log('チャレンジ:', data.challenge);
+            // チャレンジをグローバル変数に保存して後で使えるようにする
+            window.challengeCode = data.challenge;
+          }
+        })
+        .catch(error => {
+          console.error('チャレンジ取得エラー:', error);
+          // システムエラーを親ウィンドウに通知してポップアップを閉じる
+          notifyParentAndClose('system_error', 'サーバーとの通信に失敗しました');
+        });
+    }
+
+    // Symbolで認証ボタンのクリックイベント
+    document.getElementById('symbol-auth-btn').addEventListener('click', function () {
+      authenticateWithSymbol();
+    });
+
+    // デバイス判定
     function isMobileDevice() {
       return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
-    function authorize() {
-      // デバイス判定
-      const deviceType = isMobileDevice() ? 'スマートフォン' : 'PC';
+    // Symbolでの認証処理
+    function authenticateWithSymbol() {
+      // ここにSymbol認証の処理を実装
+      console.log('Symbol認証が開始されました');
+
+      // チャレンジコードが空の場合は画面を閉じエラーを表示
+      if (!window.challengeCode) {
+        notifyParentAndClose('challenge_error', 'Failed to retrieve the challenge code.');
+        return;
+      }
 
       // トランザクションの作成
-      const challengeValue = '{{CHALLENGE}}';
+      const challengeValue = window.challengeCode;
       console.log('Challenge ID:', challengeValue);
       const signTx = SymbolSignTx.createSingTx(152, '\0' + challengeValue);
 
+      // デバイス判定
+      const deviceType = isMobileDevice() ? 'スマートフォン' : 'PC';
       if (isMobileDevice()) {
         // スマートフォンの場合はaLiceをリクエスト
-        console.log('スマートフォンデバイスを検出しました。aLiceをリクエストします。');
+        console.log('スマートフォンを検出しました。aLiceをリクエストします。');
       } else {
-        // PCの場合はSSSモジュールを直接使用
+        // PCの場合はSSSモジュールをリクエスト
+        console.log('PCを検出しました。SSSをリクエストします。');
         if (SSSModule.requestSSS()) {
           SSSModule.setTransactionByPayload(signTx);
           SSSModule.requestSign().then((signedTx) => {
@@ -160,51 +121,6 @@
           });
         }
       }
-
-      // 認可を承認 - チャレンジIDを返す
-      // 実際のフローでは、クライアントが署名検証を行った後に認可コードを取得
-      const message = '認可が承認されました。チャレンジ ID: {{CHALLENGE}}<br>' +
-        '{{STATE_PARAM}}<br>' +
-        'デバイス: ' + deviceType + '<br>' +
-        'クライアントアプリケーションで署名検証を行ってください。';
-      document.getElementById('result').innerHTML =
-        '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin: 10px 0;">' +
-        message +
-        '</div>';
-
-      // ポップアップ内で認可した場合は、署名検証完了後に自動的にウィンドウが閉じられることを通知
-      if (window.opener) {
-        document.getElementById('result').innerHTML +=
-          '<div style="background: #cce5ff; color: #004085; padding: 10px; border-radius: 4px; margin: 10px 0;">' +
-          'ポップアップモードで実行中です。署名検証完了後、自動的にウィンドウが閉じられます。' +
-          '</div>';
-      }
-    }
-
-    function deny() {
-      // OAuth2準拠: エラーをredirect_uriに返す
-      const redirectUrl = new URL('{{REDIRECT_URI}}');
-      redirectUrl.searchParams.set('error', 'access_denied');
-      redirectUrl.searchParams.set('error_description', 'User denied authorization');
-
-      // ポップアップの場合は親ウィンドウにメッセージを送信
-      if (window.opener) {
-        try {
-          const redirectUri = new URL('{{REDIRECT_URI}}');
-          window.opener.postMessage({
-            error: 'access_denied',
-            error_description: 'User denied authorization'
-          }, redirectUri.origin);
-          setTimeout(() => window.close(), 100);
-        } catch (error) {
-          console.error('Error sending message to parent:', error);
-          // フォールバック: 通常のリダイレクト
-          window.location.href = redirectUrl.toString();
-        }
-      } else {
-        // 通常のリダイレクト
-        window.location.href = redirectUrl.toString();
-      }
     }
 
     // 署名検証のためのデータ送信関数
@@ -212,74 +128,24 @@
       const verificationData = {
         payload: signedTransaction
       };
-      console.log('署名検証データ:', verificationData);
+      console.log('署名検証のためのデータ:', verificationData);
 
-      // ポップアップモードかどうかを判定してヘッダーに追加
-      const headers = {
-        'Content-Type': 'application/json'
-      };
-
-      if (window.opener) {
-        headers['X-Requested-With'] = 'popup';
-      }
-
-      fetch('/oauth/verify-signature?popup=' + (window.opener ? 'true' : 'false'), {
+      fetch('/oauth/verify-signature', {
         method: 'PUT',
         headers: headers,
         body: JSON.stringify(verificationData)
       })
         .then(response => {
-          // ポップアップの場合はHTMLレスポンスが返される可能性があるため、
-          // Content-Typeをチェックしてからレスポンスを処理
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            return response.json();
-          } else {
-            // HTMLレスポンスの場合（ポップアップ処理）
-            return response.text().then(html => {
-              // HTMLレスポンスの場合は直接HTMLを実行
-              if (window.opener && html.includes('window.opener.postMessage')) {
-                // ポップアップ用のHTMLが返された場合は、そのHTMLを実行
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                const script = tempDiv.querySelector('script');
-                if (script) {
-                  eval(script.textContent);
-                }
-                return { success: true };
-              }
-              // 通常のHTMLレスポンスの場合はエラーとして扱う
-              throw new Error('Unexpected HTML response');
-            });
-          }
+          console.log('署名検証のレスポンス:', response);
         })
         .then(data => {
-          if (data.code) {
-            // JSONレスポンスで認可コードが返された場合
-            const redirectUrl = new URL('{{REDIRECT_URI}}');
-            redirectUrl.searchParams.set('code', data.code);
-            redirectUrl.searchParams.set('state', '{{STATE}}');
-            window.location.href = redirectUrl.toString();
-          } else if (data.success) {
-            // ポップアップ処理が成功した場合（HTMLレスポンス）
-            console.log('Popup processing completed');
-          } else {
-            showError('署名検証に失敗しました: ' + (data.error || '不明なエラー'));
-          }
+          console.log('署名検証成功:', data);
         })
         .catch(error => {
           console.error('検証エラー:', error);
-          showError('署名検証中にエラーが発生しました');
         });
     }
 
-    // エラー表示関数
-    function showError(message) {
-      document.getElementById('result').innerHTML =
-        '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin: 10px 0;">' +
-        message +
-        '</div>';
-    }
   </script>
 </body>
 

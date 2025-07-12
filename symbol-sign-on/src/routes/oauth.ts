@@ -12,10 +12,66 @@ import {
   AuthCodeDocument,
   ChallengeDocument
 } from '../types/auth.js'
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'development_fallback_jwt_secret' // .envファイルから読み込む
+
+// 時間形式(例: 1h, 30m)を秒数に変換する関数
+function parseTimeToSeconds(timeStr: string): number {
+  const defaultSeconds = 3600; // デフォルト: 1時間
+
+  if (!timeStr) return defaultSeconds;
+
+  // 数値のみの場合は秒数として解釈
+  if (/^\d+$/.test(timeStr)) {
+    return parseInt(timeStr, 10);
+  }
+
+  // 時間表記（例: 1h, 30m）を解釈
+  const hours = timeStr.match(/(\d+)h/);
+  const minutes = timeStr.match(/(\d+)m/);
+  const seconds = timeStr.match(/(\d+)s/);
+
+  let totalSeconds = 0;
+  if (hours) totalSeconds += parseInt(hours[1], 10) * 3600;
+  if (minutes) totalSeconds += parseInt(minutes[1], 10) * 60;
+  if (seconds) totalSeconds += parseInt(seconds[1], 10);
+
+  return totalSeconds > 0 ? totalSeconds : defaultSeconds;
+}
+
+// JWT有効期限を秒数で取得
+const JWT_EXPIRES_IN = parseTimeToSeconds(process.env.JWT_EXPIRES_IN || '1h');
+
+// 環境変数チェック
+if (!process.env.JWT_SECRET) {
+  logger.warn('JWT_SECRET環境変数が設定されていません。デフォルト値を使用します。本番環境では必ず設定してください。')
+}
+
+// 有効期限の情報はセキュリティ上の問題はないので残す
+logger.info(`JWT設定: 有効期限=${JWT_EXPIRES_IN}秒`)
+
+// JWTを生成する関数
+function generateJWT(payload: object): string {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: JWT_EXPIRES_IN,
+    algorithm: 'HS256'
+  })
+}
+
+// JWTを検証する関数
+function verifyJWT(token: string): any {
+  try {
+    return jwt.verify(token, JWT_SECRET)
+  } catch {
+    // エラーメッセージからトークン自体の値が漏れないようにする
+    logger.error(`JWT verification error: Token invalid or expired`)
+    return null
+  }
+}
 
 const router = Router()
 
-// GET /oauth/authorize
 router.get('/authorize', async (req, res) => {
   try {
     const {
@@ -29,7 +85,8 @@ router.get('/authorize', async (req, res) => {
       state
     } = req.query
 
-    logger.debug(`/oauth/authorize query: ${JSON.stringify(req.query)}`)
+    // クエリパラメータの出力は最小限にする（client_id, state, code_challengeなどを含まないように）
+    logger.debug(`/oauth/authorize request received - response_type: ${response_type || 'none'}, display: ${display || 'standard'}`)
     // ポップアップモードの検出
     const isPopupRequest = display === 'popup' || popup === 'true'
     if (isPopupRequest) {
@@ -164,18 +221,19 @@ router.get('/authorize', async (req, res) => {
   }
 })
 
-// PUT /oauth/verify-signature
 router.put('/verify-signature', async (req, res) => {
   try {
     const { payload } = req.body
-    logger.debug(`/oauth/verify-signature payload: ${payload}`)
+    // ペイロードの内容はセキュリティ上の機密情報を含む可能性があるためログ出力しない
+    logger.debug(`/oauth/verify-signature payload received (content omitted)`)
     if (!payload) {
       return res.status(400).json({ error: 'Missing payload' })
     }
 
     // 署名済みトランザクションの検証
     const tx = SymbolTransactionFactory.deserialize(utils.hexToUint8(payload))
-    logger.debug(JSON.stringify(tx.toJson(), null, 2))
+    // トランザクション詳細はセキュリティ上重要な情報を含むため最小限のログにする
+    logger.debug(`Transaction received, network: ${models.NetworkType.valueToKey(tx.network.value)}, type: ${tx.type.value}`)
     const networkName = models.NetworkType.valueToKey(tx.network.value)
     const facade = new SymbolFacade(networkName.toLowerCase())
     const isSignatureValid = facade.verifyTransaction(tx, tx.signature)
@@ -220,7 +278,8 @@ router.put('/verify-signature', async (req, res) => {
     if (!challenge) {
       return res.status(400).json({ error: 'Challenge not found in payload' })
     }
-    logger.info(`Challenge extracted: ${challenge}`)
+    // チャレンジ値はセキュリティ上重要なのでマスクする
+    logger.info(`Challenge extracted: [MASKED]`)
 
     // チャレンジ有効性チェック
     let challengeDoc
@@ -237,7 +296,8 @@ router.put('/verify-signature', async (req, res) => {
 
     // 認可コード発行
     const code = uuidv4()
-    logger.info(`Authorization code generated: ${code}`)
+    // コード自体の値はログに出さない（セキュリティ向上）
+    logger.info(`Authorization code generated (ID omitted for security)`)
     const expiresIn = 120 // 2分に短縮（セキュリティ強化）
     try {
       // 型定義に合わせて作成
@@ -286,12 +346,12 @@ router.put('/verify-signature', async (req, res) => {
         const challengeDoc2 = challengeDoc as ChallengeDocument;
         if (challengeDoc2.state) {
           redirectUrl.searchParams.set('state', challengeDoc2.state);
-          logger.debug(`Including state parameter in redirect: ${challengeDoc2.state}`);
+          logger.debug(`Including state parameter in redirect (value omitted)`);
         }
 
         // ポップアップからのリクエストの場合はpostMessageで親ウィンドウに結果を送信
         const referer = req.get('Referer')
-        console.debug(`Referer: ${referer}`)
+        // リファラー情報はセキュリティ上重要なのでログに出さない
         // ポップアップ判定ロジックの改善
         const isPopup = (
           // 明示的なポップアップパラメータ
@@ -314,15 +374,9 @@ router.put('/verify-signature', async (req, res) => {
           req.query.popup_width !== undefined
         )
 
-        // ポップアップ関連の詳細ログ出力
-        logger.debug(`isPopup: ${isPopup}`)
-        logger.debug(`popup query: ${req.query.popup}`)
-        logger.debug(`display query: ${req.query.display}`)
-        logger.debug(`x-requested-with: ${req.headers['x-requested-with']}`)
-        logger.debug(`sec-fetch-dest: ${req.headers['sec-fetch-dest']}`)
-        logger.debug(`sec-fetch-mode: ${req.headers['sec-fetch-mode']}`)
-        logger.debug(`user-agent: ${req.headers['user-agent']}`)
-        logger.debug(`window dimensions: ${req.query.popup_width}x${req.query.popup_height}`)
+        // ポップアップ関連のログは最小限に抑える
+        logger.debug(`isPopup: ${isPopup}, mode: ${req.headers['sec-fetch-mode'] || 'unknown'}`)
+        // user-agentはセキュリティ上重要な情報を含む可能性があるためログ出力しない
 
         if (isPopup) {
           const popupResponse = `
@@ -416,7 +470,6 @@ router.put('/verify-signature', async (req, res) => {
   }
 })
 
-// POST /oauth/token
 router.post('/token', async (req, res) => {
   try {
     const { grant_type, code, client_id, refresh_token, code_verifier, state } = req.body
@@ -472,7 +525,8 @@ router.post('/token', async (req, res) => {
         }
 
         if (calculatedChallenge !== authCode2.code_challenge) {
-          logger.error(`PKCE verification failed: ${calculatedChallenge} !== ${authCode2.code_challenge}`);
+          // 値そのものはログに出さない
+          logger.error(`PKCE verification failed: code_verifier does not match code_challenge`);
           return res.status(400).json({
             error: 'invalid_grant',
             error_description: 'code_verifier does not match code_challenge'
@@ -490,10 +544,18 @@ router.post('/token', async (req, res) => {
           error_description: 'state parameter does not match'
         });
       }
-      // JWT生成（ダミー）
-      const accessToken = 'FAKE_JWT_' + code
+      // JWTを生成
+      const jwtPayload = {
+        sub: authCode.address, // サブジェクトはSymbolアドレス
+        pub: authCode.publicKey, // 公開鍵
+        client_id: client_id, // クライアントID
+        iat: Math.floor(Date.now() / 1000), // 発行時刻
+        type: 'access_token' // トークンタイプ
+      }
+
+      const accessToken = generateJWT(jwtPayload)
       const refreshToken = uuidv4()
-      const expiresIn = 3600
+      const expiresIn = JWT_EXPIRES_IN
       // 認可コードをusedに
       try {
         await AuthCodes.updateOne(
@@ -524,6 +586,8 @@ router.post('/token', async (req, res) => {
         )
         // リフレッシュトークン保存失敗は致命的ではないので続行
       }
+      // トークン発行成功のログ（トークン値は出力しない）
+      logger.info(`Token issued successfully for client: ${client_id}`)
       res.json({
         access_token: accessToken,
         refresh_token: refreshToken,
@@ -549,10 +613,19 @@ router.post('/token', async (req, res) => {
           .status(400)
           .json({ error: 'Invalid or used/expired refresh_token' })
       }
-      // 新しいJWT/リフレッシュトークン発行（ダミー）
-      const accessToken = 'FAKE_JWT_' + refresh_token
+      // 新しいJWT/リフレッシュトークン発行
+      const jwtPayload = {
+        sub: tokenDoc.address, // サブジェクトはSymbolアドレス
+        pub: tokenDoc.publicKey, // 公開鍵
+        client_id: client_id, // クライアントID
+        iat: Math.floor(Date.now() / 1000), // 発行時刻
+        type: 'access_token', // トークンタイプ
+        refresh: true // リフレッシュから発行されたトークン
+      }
+
+      const accessToken = generateJWT(jwtPayload)
       const newRefreshToken = uuidv4()
-      const expiresIn = 3600
+      const expiresIn = JWT_EXPIRES_IN
       // 古いトークンをusedに
       try {
         await Tokens.updateOne(
@@ -581,6 +654,8 @@ router.post('/token', async (req, res) => {
         )
         // リフレッシュトークン保存失敗は致命的ではないので続行
       }
+      // リフレッシュトークンによる再発行成功のログ（トークン値は出力しない）
+      logger.info(`Token refreshed successfully for client: ${client_id}`)
       res.json({
         access_token: accessToken,
         refresh_token: newRefreshToken,
@@ -595,7 +670,6 @@ router.post('/token', async (req, res) => {
   }
 })
 
-// GET /oauth/userinfo
 router.get('/userinfo', async (req, res) => {
   try {
     const auth = req.headers['authorization']
@@ -604,12 +678,24 @@ router.get('/userinfo', async (req, res) => {
         .status(401)
         .json({ error: 'Missing or invalid Authorization header' })
     }
-    const _token = auth.replace('Bearer ', '').trim()
-    // TODO: JWT検証（現状はダミー）
-    // ダミー: トークン末尾からアドレス・公開鍵・ネットワークを生成
-    const address = 'FAKE_ADDRESS'
-    const publicKey = 'FAKE_PUBLIC_KEY'
-    const network = 'testnet'
+
+    // トークンを取得して検証（トークン値はログに出さない）
+    const token = auth.replace('Bearer ', '').trim()
+    logger.debug('Processing userinfo request with provided token')
+    const decodedToken = verifyJWT(token)
+
+    // トークン検証失敗
+    if (!decodedToken) {
+      return res.status(401).json({
+        error: 'invalid_token',
+        error_description: 'The access token is invalid or has expired'
+      })
+    }
+
+    // トークンから情報を取得
+    const address = decodedToken.sub
+    const publicKey = decodedToken.pub
+    const network = 'testnet' // ネットワーク情報はトークンに入れるかサーバー側で管理
     res.json({ address, publicKey, network })
   } catch (err) {
     logger.error(`/oauth/userinfo error: ${(err as Error).message}`)
@@ -617,7 +703,6 @@ router.get('/userinfo', async (req, res) => {
   }
 })
 
-// POST /oauth/logout
 router.post('/logout', async (req, res) => {
   try {
     const { refresh_token } = req.body

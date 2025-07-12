@@ -1,19 +1,12 @@
 /**
  * OAuth2認証で使用する型定義
  */
-
-/**
- * クライアントドキュメントの型
- */
 export interface ClientDocument {
   client_id: string
   trusted_redirect_uris: string[]
   createdAt: Date
 }
 
-/**
- * チャレンジドキュメントの型
- */
 export interface ChallengeDocument {
   challenge: string
   publicKey?: string | null
@@ -28,9 +21,6 @@ export interface ChallengeDocument {
   state?: string | null
 }
 
-/**
- * 認可コードドキュメントの型
- */
 export interface AuthCodeDocument {
   code: string
   address: string
@@ -46,9 +36,6 @@ export interface AuthCodeDocument {
   state?: string | null
 }
 
-/**
- * トークンドキュメントの型
- */
 export interface TokenDocument {
   refresh_token: string
   address: string

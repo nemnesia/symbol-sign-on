@@ -109,15 +109,7 @@ npm run test:coverage
 npm run test:ui
 ```
 
-### 個別テストの実行
 
-```bash
-# 特定のテストファイルのみ実行
-npx vitest run __tests__/auth.test.ts
-
-# 特定のテストケースのみ実行
-npx vitest run --grep "チャレンジを正常に生成する"
-```
 
 ## API エンドポイント
 
@@ -226,7 +218,6 @@ npm cache clean --force
 ### 設定ファイル
 
 - `tsconfig.json` - TypeScript設定
-- `vitest.config.ts` - テスト設定
 - `.env` - 環境変数設定
 
 ## 本番環境との違い

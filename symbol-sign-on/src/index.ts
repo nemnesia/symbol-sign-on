@@ -40,7 +40,7 @@ app.get('/health', async (req, res) => {
   try {
     // MongoDB接続状態を確認
     const dbStatus = await checkDatabaseConnection();
-    
+
     const healthStatus = {
       status: dbStatus ? 'OK' : 'DEGRADED',
       timestamp: new Date().toISOString(),
@@ -50,7 +50,7 @@ app.get('/health', async (req, res) => {
       memory: process.memoryUsage(),
       environment: process.env.NODE_ENV || 'development'
     };
-    
+
     const statusCode = dbStatus ? 200 : 503;
     res.status(statusCode).json(healthStatus);
   } catch (error) {
@@ -69,7 +69,7 @@ async function checkDatabaseConnection(): Promise<boolean> {
     const { getDb } = await import('./db/database.js');
     const db = getDb();
     if (!db) return false;
-    
+
     // ping コマンドでDB接続を確認
     await db.admin().ping();
     return true;
@@ -81,16 +81,16 @@ async function checkDatabaseConnection(): Promise<boolean> {
 // 404ハンドラー
 app.use('*', (req, res) => {
   // Chrome DevToolsや開発者ツール関連のリクエストはログレベルを下げる
-  const isDevToolsRequest = req.originalUrl.includes('/.well-known/') || 
+  const isDevToolsRequest = req.originalUrl.includes('/.well-known/') ||
                            req.originalUrl.includes('/favicon.ico') ||
                            req.originalUrl.includes('/chrome-extension/');
-  
+
   if (isDevToolsRequest) {
     logger.debug(`404 - ${req.method} ${req.originalUrl}`);
   } else {
     logger.warn(`404 - ${req.method} ${req.originalUrl}`);
   }
-  
+
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
@@ -121,7 +121,7 @@ async function startServer() {
       logger.info(`  POST /oauth/verify-signature - Verify Symbol signature`);
       logger.info(`  POST /oauth/token - Exchange code for token`);
       logger.info(`  GET  /oauth/userinfo - Get user info`);
-      logger.info(`  GET  /demo.html - Demo page`);
+      logger.info(`  GET  /login-demo.html - Demo page`);
     });
   } catch (error) {
     logger.error(`Failed to start server: ${(error as Error).message}`);

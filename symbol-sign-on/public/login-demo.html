@@ -4,28 +4,142 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Symbol Login Demo</title>
+  <title>Symbol Sign On Demo</title>
   <style>
+    /* 全体のスタイル */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* コンテナスタイル */
+    .container {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    /* ヘッダースタイル */
+    h1 {
+      color: #5200c6;
+      /* Symbolブランドカラー */
+      text-align: center;
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+
+    .logo {
+      max-width: 120px;
+      display: block;
+      margin: 0 auto 20px;
+    }
+
+    /* エラーメッセージスタイル */
     .error-message {
-      color: red;
-      padding: 10px;
-      margin: 10px 0;
-      border: 1px solid red;
+      color: #e74c3c;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+      background-color: rgba(231, 76, 60, 0.1);
+      border-left: 4px solid #e74c3c;
       display: none;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    /* ボタンコンテナ */
+    .button-container {
+      margin: 25px 0;
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+    }
+
+    /* ボタンスタイル */
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      background-color: #5200c6;
+      /* Symbolのブランドカラー */
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(82, 0, 198, 0.3);
+    }
+
+    button:hover {
+      background-color: #6e00ff;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    /* スマホ表示用のスタイル */
+    @media (max-width: 768px) {
+      .button-container {
+        flex-direction: column;
+      }
+
+      button {
+        display: block;
+        width: 100%;
+        margin-bottom: 10px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <h1>Symbolでログイン</h1>
+  <div class="container">
+    <!-- Symbol ロゴ（オプション：ロゴ画像がある場合） -->
+    <img src="https://symbolplatform.com/img/symbol_logo.svg" alt="Symbol Logo" class="logo">
 
-  <!-- ポップアップパターン -->
-  <button id="popup-login">ポップアップでログイン</button>
+    <h1>Symbol Sign On Demo</h1>
 
-  <!-- エラーメッセージ表示エリア -->
-  <div id="error-message" class="error-message"></div>
+    <div class="button-container">
+      <!-- デバイス検出に基づいて表示・非表示が切り替わるボタン -->
+      <button id="popup-login">ポップアップでログイン</button>
+      <button id="redirect-login">リダイレクトでログイン</button>
+    </div>
+
+    <!-- エラーメッセージ表示エリア -->
+    <div id="error-message" class="error-message"></div>
+  </div>
 
   <script>
+    // デバイス判定
+    function isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // デバイスタイプに応じてUIを調整
+    const isMobile = isMobileDevice();
+    const popupButton = document.getElementById('popup-login');
+    const redirectButton = document.getElementById('redirect-login');
+
+    if (isMobile) {
+      // モバイルの場合はリダイレクトボタンのみ表示
+      popupButton.style.display = 'none';
+      redirectButton.style.display = 'block';
+    } else {
+      // デスクトップの場合はポップアップボタンをデフォルトとし、リダイレクトも選択可能に
+      popupButton.style.display = 'inline-block';
+      redirectButton.style.display = 'inline-block';
+    }
+
     // エラーメッセージを表示する関数
     function showError(error, description) {
       const errorElement = document.getElementById('error-message');
@@ -33,19 +147,127 @@
       errorElement.style.display = 'block';
     }
 
+    // URL パラメータからコードを取得する関数
+    function getCodeFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      if (code) {
+        // コードが取得できた場合の処理
+        console.log('認可コード取得成功:', code);
+
+        // 成功メッセージを表示
+        const successMessage = document.createElement('div');
+        successMessage.style.color = '#27ae60';
+        successMessage.style.padding = '15px';
+        successMessage.style.margin = '15px 0';
+        successMessage.style.borderRadius = '5px';
+        successMessage.style.backgroundColor = 'rgba(39, 174, 96, 0.1)';
+        successMessage.style.borderLeft = '4px solid #27ae60';
+        successMessage.style.textAlign = 'left';
+        successMessage.textContent = `認証に成功しました！認可コード: ${code}`;
+        successMessage.setAttribute('data-auth-success', 'true'); // 認証成功のマーカー追加
+        document.querySelector('.container').appendChild(successMessage);
+
+        // トークンエンドポイントにリクエストを送信
+        fetchTokenWithCode(code);
+
+        // URL パラメータをクリア（セキュリティ向上のため）
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
+    // 認可コードを使ってトークンを取得する関数（重複定義を削除）
+
+    // ページロード時に URL パラメータをチェック（リダイレクト認証からの戻り）
+    document.addEventListener('DOMContentLoaded', getCodeFromUrl);
+
     // ポップアップウィンドウからのメッセージを受け取る
-    window.addEventListener('message', function(event) {
+    window.addEventListener('message', function (event) {
+      console.log('受信したメッセージ:', event.data);
+
+      // 送信元オリジンの検証（セキュリティ向上のため）
+      if (event.origin !== window.location.origin) {
+        console.warn('不明なオリジンからのメッセージ:', event.origin);
+        // 必要に応じて、信頼できるオリジンのリストをチェックする実装も可能
+      }
+
       if (event.data && event.data.type === 'login_error') {
         // ポップアップから送られてきたエラーを表示
         showError(event.data.error, event.data.errorDescription);
+      } else if (event.data && event.data.type === 'oauth_success') {
+        // 認証成功の処理
+        console.log('認証成功、コード:', event.data.code);
+
+        // 認証成功メッセージを表示
+        const successMessage = document.createElement('div');
+        successMessage.style.color = '#27ae60';
+        successMessage.style.padding = '15px';
+        successMessage.style.margin = '15px 0';
+        successMessage.style.borderRadius = '5px';
+        successMessage.style.backgroundColor = 'rgba(39, 174, 96, 0.1)';
+        successMessage.style.borderLeft = '4px solid #27ae60';
+        successMessage.style.textAlign = 'left';
+        successMessage.textContent = '認証に成功しました！認可コードを取得しました。';
+        document.querySelector('.container').appendChild(successMessage);
+
+        // トークンエンドポイントへのリクエスト実行
+        fetchTokenWithCode(event.data.code);
       }
     });
+
+    // 認可コードを使ってトークンを取得する関数
+    async function fetchTokenWithCode(code) {
+      try {
+        const response = await fetch('/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            grant_type: 'authorization_code',
+            code: code,
+            client_id: 'demo_app'
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          console.log('トークン取得成功:', data);
+          // 取得したトークンを表示
+          const tokenInfo = document.createElement('div');
+          tokenInfo.style.marginTop = '20px';
+          tokenInfo.style.padding = '15px';
+          tokenInfo.style.backgroundColor = '#f8f9fa';
+          tokenInfo.style.borderRadius = '5px';
+          tokenInfo.style.textAlign = 'left';
+          tokenInfo.innerHTML = `
+            <h3>取得したトークン情報:</h3>
+            <pre style="overflow-x: auto; background: #eee; padding: 10px; border-radius: 4px;">${JSON.stringify(data, null, 2)}</pre>
+            <p>※ このトークンを使って、Symbol Sign On APIにアクセスできます。</p>
+          `;
+          document.querySelector('.container').appendChild(tokenInfo);
+        } else {
+          console.error('トークン取得エラー:', data);
+          showError('トークン取得エラー', data.error || '不明なエラーが発生しました');
+        }
+      } catch (error) {
+        console.error('トークン取得時に例外が発生:', error);
+        showError('通信エラー', 'サーバーとの通信中にエラーが発生しました');
+      }
+    }
 
     // ポップアップパターンの処理
     document.getElementById('popup-login').addEventListener('click', function () {
       // エラーメッセージをクリア
       document.getElementById('error-message').style.display = 'none';
 
+      // ボタンの状態を変更して処理中を示す
+      const button = this;
+      button.disabled = true;
+      button.textContent = '認証中...';
+      button.style.backgroundColor = '#9370DB';
+
+      // ポップアップの設定
       const popupWidth = 500;
       const popupHeight = 600;
 
@@ -53,11 +275,69 @@
       const left = Math.max(0, window.screenX + (window.innerWidth - popupWidth) / 2);
       const top = Math.max(0, window.screenY + (window.innerHeight - popupHeight) / 2);
 
-      window.open(
-        '/login.html?client_id=demo_app&redirect_uri=http://localhost:3510/login-demo.html',
+      // ポップアップステータスメッセージ作成
+      const statusMessage = document.createElement('div');
+      statusMessage.id = 'popup-status';
+      statusMessage.style.margin = '15px 0';
+      statusMessage.style.padding = '10px';
+      statusMessage.style.backgroundColor = '#fff3cd';
+      statusMessage.style.color = '#856404';
+      statusMessage.style.borderRadius = '5px';
+      statusMessage.style.border = '1px solid #ffeeba';
+      statusMessage.textContent = 'ポップアップウィンドウで認証を完了してください...';
+      document.querySelector('.container').appendChild(statusMessage);
+
+      // ユニークな状態識別子を生成
+      const state = Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+      // ポップアップを開く
+      const popup = window.open(
+        `/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent('http://localhost:3510/login-demo.html')}&popup=true&display=popup&state=${state}&popup_width=${popupWidth}&popup_height=${popupHeight}`,
         'SymbolLoginPopup',
         `width=${popupWidth},height=${popupHeight},top=${top},left=${left}`
       );
+
+      // ポップアップが閉じられた場合の検知
+      const popupCheckInterval = setInterval(() => {
+        if (popup && popup.closed) {
+          clearInterval(popupCheckInterval);
+          // ボタンを元に戻す
+          button.disabled = false;
+          button.textContent = 'ポップアップでログイン';
+          button.style.backgroundColor = '#5200c6';
+
+          // ステータスメッセージを更新（認証コードを受け取っていない場合のみ）
+          const statusMsg = document.getElementById('popup-status');
+          if (statusMsg && !document.querySelector('[data-auth-success="true"]')) {
+            statusMsg.style.backgroundColor = '#f8d7da';
+            statusMsg.style.color = '#721c24';
+            statusMsg.style.borderColor = '#f5c6cb';
+            statusMsg.textContent = 'ポップアップが閉じられました。認証が完了していない可能性があります。';
+          }
+        }
+      }, 500);
+    });
+
+    // リダイレクトパターンの処理
+    document.getElementById('redirect-login').addEventListener('click', function () {
+      // エラーメッセージをクリア
+      document.getElementById('error-message').style.display = 'none';
+
+      // 状態を表示
+      const statusMessage = document.createElement('div');
+      statusMessage.textContent = 'リダイレクト認証を開始します...';
+      statusMessage.style.margin = '10px 0';
+      statusMessage.style.padding = '10px';
+      statusMessage.style.backgroundColor = '#fcf8e3';
+      statusMessage.style.borderRadius = '4px';
+      document.querySelector('.container').appendChild(statusMessage);
+
+      // ユニークな状態識別子を生成（リダイレクト後に検証するため）
+      const state = Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+      // 直接認証画面にリダイレクト（stateとdisplayパラメータを追加）
+      // window.location.replace を使用してGETリクエストになるようにする
+      window.location.replace(`/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent('http://localhost:3510/login-demo.html')}&state=${state}&display=redirect`);
     });
   </script>
 </body>

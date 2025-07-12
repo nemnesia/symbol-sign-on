@@ -14,8 +14,13 @@ const router = Router()
 // GET /oauth/authorize
 router.get('/authorize', async (req, res) => {
   try {
-    const { response_type, client_id, redirect_uri } = req.query
+    const { response_type, client_id, redirect_uri, display, popup } = req.query
     logger.debug(`/oauth/authorize query: ${JSON.stringify(req.query)}`)
+    // ポップアップモードの検出
+    const isPopupRequest = display === 'popup' || popup === 'true'
+    if (isPopupRequest) {
+      logger.info(`Popup authorization flow detected`)
+    }
 
     // OAuth2必須パラメータの検証
     if (!response_type || !client_id || !redirect_uri) {
@@ -187,6 +192,7 @@ router.put('/verify-signature', async (req, res) => {
 
     // 認可コード発行
     const code = uuidv4()
+    logger.info(`Authorization code generated: ${code}`)
     const expiresIn = 300 // 5分
     try {
       await AuthCodes.insertOne({
@@ -219,15 +225,38 @@ router.put('/verify-signature', async (req, res) => {
         // ポップアップからのリクエストの場合はpostMessageで親ウィンドウに結果を送信
         const referer = req.get('Referer')
         console.debug(`Referer: ${referer}`)
-        const isPopup =
+        // ポップアップ判定ロジックの改善
+        const isPopup = (
+          // 明示的なポップアップパラメータ
           req.query.popup === 'true' ||
+          req.query.display === 'popup' ||
+          // ヘッダーベースの判定
           req.headers['x-requested-with'] === 'popup' ||
-          (referer && referer.includes('oauth_popup')) ||
-          (referer && referer.includes('authorize'))
+          // 特定のポップアップウィンドウの特徴
+          (req.headers['sec-fetch-dest'] === 'document' && req.headers['sec-fetch-mode'] === 'navigate') ||
+          // リファラーベースの判定（より具体的に）
+          (referer && (
+            referer.includes('oauth_popup') ||
+            referer.includes('popup=true') ||
+            referer.includes('display=popup') ||
+            // 'authorize'を含むが、より具体的な判定
+            (referer.includes('authorize') && referer.includes('window.open'))
+          )) ||
+          // ウィンドウサイズがポップアップに典型的なサイズかチェック
+          req.query.popup_height !== undefined ||
+          req.query.popup_width !== undefined
+        )
 
-        console.debug(`isPopup: ${isPopup}`)
-        console.debug(`popup query: ${req.query.popup}`)
-        console.debug(`x-requested-with: ${req.headers['x-requested-with']}`)
+        // ポップアップ関連の詳細ログ出力
+        logger.debug(`isPopup: ${isPopup}`)
+        logger.debug(`popup query: ${req.query.popup}`)
+        logger.debug(`display query: ${req.query.display}`)
+        logger.debug(`x-requested-with: ${req.headers['x-requested-with']}`)
+        logger.debug(`sec-fetch-dest: ${req.headers['sec-fetch-dest']}`)
+        logger.debug(`sec-fetch-mode: ${req.headers['sec-fetch-mode']}`)
+        logger.debug(`user-agent: ${req.headers['user-agent']}`)
+        logger.debug(`window dimensions: ${req.query.popup_width}x${req.query.popup_height}`)
+
         if (isPopup) {
           const popupResponse = `
 <!DOCTYPE html>
@@ -238,20 +267,48 @@ router.put('/verify-signature', async (req, res) => {
 <body>
   <script>
     try {
-      if (window.opener) {
-        // POSTメッセージで認可コードを送信
-        window.opener.postMessage({
+      // ポップアップかどうかをより正確に判定
+      const isWindowPopup = window.opener && window.opener !== window;
+      const isIframePopup = window.parent && window.parent !== window;
+
+      if (isWindowPopup) {
+        // ポップアップデータをより堅牢に親ウィンドウに送信
+        const message = {
           type: 'oauth_success',
           code: '${code}',
           redirect_uri: '${challengeDoc.redirect_uri}',
-          method: 'POST'  // POSTメソッドを明示
-        }, '${new URL(challengeDoc.redirect_uri).origin}');
-        setTimeout(() => window.close(), 500);
+          method: 'POST',
+          isPopup: true,
+          origin: window.location.origin,
+          timestamp: new Date().toISOString()
+        };
+
+        // 親ウィンドウに成功メッセージを送信
+        window.opener.postMessage(message, '${new URL(challengeDoc.redirect_uri).origin}');
+
+        // 送信確認のためのタイムアウト後にポップアップを閉じる
+        console.log('認証成功：親ウィンドウにコード送信中...');
+        setTimeout(() => {
+          console.log('ポップアップを閉じます');
+          window.close();
+        }, 800);
+      } else if (isIframePopup) {
+        // iframeの場合は親フレームにメッセージを送信
+        window.parent.postMessage({
+          type: 'oauth_success',
+          code: '${code}',
+          redirect_uri: '${challengeDoc.redirect_uri}',
+          method: 'POST',
+          isPopup: true,
+          isIframe: true
+        }, '*');
       } else {
+        // 通常のリダイレクト
         window.location.href = '${redirectUrl.toString()}';
       }
     } catch (error) {
       console.error('Error sending message to parent:', error);
+      // エラー発生時はリダイレクトでフォールバック
       window.location.href = '${redirectUrl.toString()}';
     }
   </script>
@@ -260,7 +317,21 @@ router.put('/verify-signature', async (req, res) => {
 </html>`
           return res.send(popupResponse)
         } else {
-          return res.redirect(redirectUrl.toString())
+          // GETリクエストでリダイレクトされるように、明示的にHTMLリダイレクトを行う
+          return res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Redirecting...</title>
+  <meta http-equiv="refresh" content="0;url=${redirectUrl.toString()}">
+</head>
+<body>
+  <p>リダイレクトしています...</p>
+  <script>
+    window.location.replace('${redirectUrl.toString()}');
+  </script>
+</body>
+</html>`);
         }
       } catch (redirectError) {
         logger.error(

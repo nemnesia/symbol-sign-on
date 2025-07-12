@@ -47,6 +47,12 @@
       text-align: center;
     }
 
+    .logo {
+      max-width: 120px;
+      display: block;
+      margin: 0 auto 20px;
+    }
+
     p {
       margin: 10px 0;
     }
@@ -111,6 +117,8 @@
 
 <body>
   <div class="container">
+    <img src="./Symbol_Logo_primary_light_BG.svg" alt="Symbol Logo" class="logo">
+
     <h1>Symbol Sign On</h1>
     <div id="auth-details">
       <p>Client ID: <span id="client-id"></span></p>
@@ -137,7 +145,7 @@
     if (code) {
       console.log('認可コードを検出しました:', code);
       // 既に認可コードが取得できている場合は成功メッセージを表示
-      document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener('DOMContentLoaded', function () {
         showSuccess('認証成功！認可コード：' + code);
         document.getElementById('symbol-auth-btn').style.display = 'none';
         document.getElementById('status').textContent = '既に認証されています';

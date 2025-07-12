@@ -550,6 +550,7 @@ router.post('/token', async (req, res) => {
         pub: authCode.publicKey, // 公開鍵
         client_id: client_id, // クライアントID
         iat: Math.floor(Date.now() / 1000), // 発行時刻
+        jti: uuidv4(), // JWT ID - 一意性を保証
         type: 'access_token' // トークンタイプ
       }
 
@@ -619,6 +620,7 @@ router.post('/token', async (req, res) => {
         pub: tokenDoc.publicKey, // 公開鍵
         client_id: client_id, // クライアントID
         iat: Math.floor(Date.now() / 1000), // 発行時刻
+        jti: uuidv4(), // JWT ID - 一意性を保証
         type: 'access_token', // トークンタイプ
         refresh: true // リフレッシュから発行されたトークン
       }

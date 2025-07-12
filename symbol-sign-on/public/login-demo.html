@@ -105,7 +105,7 @@
 <body>
   <div class="container">
     <!-- Symbol ロゴ（オプション：ロゴ画像がある場合） -->
-    <img src="https://symbolplatform.com/img/symbol_logo.svg" alt="Symbol Logo" class="logo">
+    <img src="./Symbol_Logo_primary_light_BG.svg" alt="Symbol Logo" class="logo">
 
     <h1>Symbol Sign On Demo</h1>
 
@@ -232,6 +232,177 @@
       }
     });
 
+    // トークンをlocalStorageに保存する関数
+    function saveTokensToStorage(tokenData) {
+      try {
+        localStorage.setItem('access_token', tokenData.access_token);
+
+        if (tokenData.refresh_token) {
+          localStorage.setItem('refresh_token', tokenData.refresh_token);
+        }
+
+        // 有効期限を計算して保存
+        if (tokenData.expires_in) {
+          const expiresAt = Date.now() + (tokenData.expires_in * 1000);
+          localStorage.setItem('expires_at', expiresAt);
+        }
+
+        console.log('トークンがlocalStorageに保存されました');
+      } catch (error) {
+        console.error('トークン保存エラー:', error);
+      }
+    }
+
+    // アクセストークンの期限チェック機能
+    function isAccessTokenExpired() {
+      const expiresAt = localStorage.getItem('expires_at');
+
+      if (!expiresAt) {
+        return true; // 有効期限情報がない場合は期限切れとみなす
+      }
+
+      const now = Date.now();
+      const expiration = parseInt(expiresAt);
+
+      return now >= expiration;
+    }
+
+    // トークンの残り時間を計算
+    function getTokenTimeRemaining() {
+      const expiresAt = localStorage.getItem('expires_at');
+
+      if (!expiresAt) {
+        return null;
+      }
+
+      const now = Date.now();
+      const expiration = parseInt(expiresAt);
+      const remaining = expiration - now;
+
+      if (remaining <= 0) {
+        return 0;
+      }
+
+      return Math.floor(remaining / 1000); // 秒単位で返す
+    }
+
+    // 期限チェック結果を表示する関数
+    function checkAccessTokenExpiry() {
+      const accessToken = localStorage.getItem('access_token');
+
+      if (!accessToken) {
+        return {
+          status: 'no_token',
+          message: 'アクセストークンが見つかりません',
+          color: '#e74c3c'
+        };
+      }
+
+      const timeRemaining = getTokenTimeRemaining();
+
+      if (timeRemaining === null) {
+        return {
+          status: 'no_expiry',
+          message: '有効期限情報がありません',
+          color: '#f39c12'
+        };
+      }
+
+      if (timeRemaining <= 0) {
+        return {
+          status: 'expired',
+          message: 'アクセストークンは期限切れです',
+          color: '#e74c3c'
+        };
+      }
+
+      // 残り時間を人間が読みやすい形式に変換
+      const hours = Math.floor(timeRemaining / 3600);
+      const minutes = Math.floor((timeRemaining % 3600) / 60);
+      const seconds = timeRemaining % 60;
+
+      let timeString = '';
+      if (hours > 0) {
+        timeString = `${hours}時間${minutes}分`;
+      } else if (minutes > 0) {
+        timeString = `${minutes}分${seconds}秒`;
+      } else {
+        timeString = `${seconds}秒`;
+      }
+
+      // 5分以内なら警告色
+      const color = timeRemaining <= 300 ? '#f39c12' : '#27ae60';
+
+      return {
+        status: 'valid',
+        message: `アクセストークンは有効です（残り: ${timeString}）`,
+        color: color,
+        timeRemaining: timeRemaining
+      };
+    }
+
+    // 期限チェック結果を表示する関数
+    function showTokenExpiryStatus() {
+      const result = checkAccessTokenExpiry();
+
+      // 既存の期限チェック結果があれば削除
+      const existingResult = document.querySelector('[data-expiry-result]');
+      if (existingResult) {
+        existingResult.remove();
+      }
+
+      // 結果を表示するエリアを作成
+      const expiryResult = document.createElement('div');
+      expiryResult.style.marginTop = '15px';
+      expiryResult.style.padding = '10px';
+      expiryResult.style.borderRadius = '4px';
+      expiryResult.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+      expiryResult.style.border = `2px solid ${result.color}`;
+      expiryResult.style.color = result.color;
+      expiryResult.style.fontWeight = 'bold';
+      expiryResult.setAttribute('data-expiry-result', 'true');
+
+      // ステータスに応じてアイコンを追加
+      let icon = '';
+      switch (result.status) {
+        case 'valid':
+          icon = '✅ ';
+          break;
+        case 'expired':
+          icon = '❌ ';
+          break;
+        case 'no_token':
+          icon = '⚠️ ';
+          break;
+        case 'no_expiry':
+          icon = '⚠️ ';
+          break;
+      }
+
+      expiryResult.innerHTML = `
+        <div style="text-align: center;">
+          ${icon}${result.message}
+        </div>
+      `;
+
+      // 期限が近い場合は自動リフレッシュの提案を表示
+      if (result.status === 'valid' && result.timeRemaining && result.timeRemaining <= 300) {
+        const suggestionDiv = document.createElement('div');
+        suggestionDiv.style.marginTop = '8px';
+        suggestionDiv.style.fontSize = '12px';
+        suggestionDiv.style.color = '#666';
+        suggestionDiv.style.textAlign = 'center';
+        suggestionDiv.textContent = '💡 期限が近づいています。リフレッシュトークンテストで更新できます。';
+        expiryResult.appendChild(suggestionDiv);
+      }
+
+      // ボタンのコンテナに結果を追加
+      const tokenInfo = document.querySelector('.container > div:last-child');
+      if (tokenInfo) {
+        tokenInfo.appendChild(expiryResult);
+      }
+    }
+
     // 認可コードを使ってトークンを取得する関数
     async function fetchTokenWithCode(code) {
       try {
@@ -250,6 +421,10 @@
         const data = await response.json();
         if (response.ok) {
           console.log('トークン取得成功:', data);
+
+          // トークンをlocalStorageに保存
+          saveTokensToStorage(data);
+
           // 取得したトークンを表示
           const tokenInfo = document.createElement('div');
           tokenInfo.style.marginTop = '20px';
@@ -262,6 +437,97 @@
             <pre style="overflow-x: auto; background: #eee; padding: 10px; border-radius: 4px;">${JSON.stringify(data, null, 2)}</pre>
             <p>※ このトークンを使って、Symbol Sign On APIにアクセスできます。</p>
           `;
+
+          // ボタンコンテナを作成
+          const buttonContainer = document.createElement('div');
+          buttonContainer.style.marginTop = '10px';
+          buttonContainer.style.textAlign = 'center';
+          buttonContainer.style.display = 'flex';
+          buttonContainer.style.gap = '10px';
+          buttonContainer.style.justifyContent = 'center';
+          buttonContainer.style.flexWrap = 'wrap';
+
+          // アクセストークン期限チェックボタン
+          const checkExpiryButton = document.createElement('button');
+          checkExpiryButton.textContent = '期限チェック';
+          checkExpiryButton.style.padding = '8px 16px';
+          checkExpiryButton.style.fontSize = '14px';
+          checkExpiryButton.style.backgroundColor = '#28a745';
+          checkExpiryButton.style.color = 'white';
+          checkExpiryButton.style.border = 'none';
+          checkExpiryButton.style.borderRadius = '4px';
+          checkExpiryButton.style.cursor = 'pointer';
+          checkExpiryButton.style.transition = 'background-color 0.3s ease';
+
+          checkExpiryButton.addEventListener('mouseover', function() {
+            this.style.backgroundColor = '#218838';
+          });
+
+          checkExpiryButton.addEventListener('mouseout', function() {
+            this.style.backgroundColor = '#28a745';
+          });
+
+          checkExpiryButton.addEventListener('click', function() {
+            showTokenExpiryStatus();
+          });
+
+          buttonContainer.appendChild(checkExpiryButton);
+
+          // リフレッシュトークンが存在する場合、リフレッシュテストボタンを追加
+          if (data.refresh_token) {
+            const refreshButton = document.createElement('button');
+            refreshButton.textContent = 'リフレッシュトークンテスト';
+            refreshButton.style.padding = '8px 16px';
+            refreshButton.style.fontSize = '14px';
+            refreshButton.style.backgroundColor = '#17a2b8';
+            refreshButton.style.color = 'white';
+            refreshButton.style.border = 'none';
+            refreshButton.style.borderRadius = '4px';
+            refreshButton.style.cursor = 'pointer';
+            refreshButton.style.transition = 'background-color 0.3s ease';
+
+            refreshButton.addEventListener('mouseover', function () {
+              this.style.backgroundColor = '#138496';
+            });
+
+            refreshButton.addEventListener('mouseout', function () {
+              this.style.backgroundColor = '#17a2b8';
+            });
+
+            refreshButton.addEventListener('click', function () {
+              testRefreshToken(data.refresh_token);
+            });
+
+            buttonContainer.appendChild(refreshButton);
+          }
+
+          // ユーザー情報取得ボタンを追加
+          const userInfoButton = document.createElement('button');
+          userInfoButton.textContent = 'ユーザー情報取得';
+          userInfoButton.style.padding = '8px 16px';
+          userInfoButton.style.fontSize = '14px';
+          userInfoButton.style.backgroundColor = '#6f42c1';
+          userInfoButton.style.color = 'white';
+          userInfoButton.style.border = 'none';
+          userInfoButton.style.borderRadius = '4px';
+          userInfoButton.style.cursor = 'pointer';
+          userInfoButton.style.transition = 'background-color 0.3s ease';
+
+          userInfoButton.addEventListener('mouseover', function () {
+            this.style.backgroundColor = '#5a359a';
+          });
+
+          userInfoButton.addEventListener('mouseout', function () {
+            this.style.backgroundColor = '#6f42c1';
+          });
+
+          userInfoButton.addEventListener('click', function () {
+            fetchUserInfo();
+          });
+
+          buttonContainer.appendChild(userInfoButton);
+
+          tokenInfo.appendChild(buttonContainer);
           document.querySelector('.container').appendChild(tokenInfo);
         } else {
           console.error('トークン取得エラー:', data);
@@ -270,6 +536,239 @@
       } catch (error) {
         console.error('トークン取得時に例外が発生:', error);
         showError('通信エラー', 'サーバーとの通信中にエラーが発生しました');
+      }
+    }
+
+    // リフレッシュトークンをテストする関数
+    async function testRefreshToken(refreshToken) {
+      // ボタンを無効化して処理中であることを示す
+      const refreshButton = event.target;
+      let currentButton = refreshButton; // 現在のボタンの参照を保持
+
+      try {
+        console.log('リフレッシュトークンテスト開始:', refreshToken);
+
+        currentButton.disabled = true;
+        currentButton.textContent = 'リフレッシュ中...';
+        currentButton.style.backgroundColor = '#6c757d';
+
+        const response = await fetch('/oauth/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: 'demo_app'
+          })
+        });
+
+        const data = await response.json();
+
+        // 結果を表示するエリアを作成
+        const refreshResult = document.createElement('div');
+        refreshResult.style.marginTop = '15px';
+        refreshResult.style.padding = '10px';
+        refreshResult.style.borderRadius = '4px';
+
+        if (response.ok) {
+          console.log('リフレッシュトークンテスト成功:', data);
+
+          // 新しいトークンをlocalStorageに保存
+          saveTokensToStorage(data);
+
+          refreshResult.style.backgroundColor = 'rgba(39, 174, 96, 0.1)';
+          refreshResult.style.borderLeft = '4px solid #27ae60';
+          refreshResult.style.color = '#27ae60';
+          refreshResult.innerHTML = `
+            <h4>リフレッシュトークンテスト成功!</h4>
+            <pre style="overflow-x: auto; background: #eee; padding: 8px; border-radius: 4px; color: #333;">${JSON.stringify(data, null, 2)}</pre>
+            <p style="margin: 5px 0; color: #333;">新しいアクセストークンが正常に取得されました。</p>
+          `;
+
+          // 新しいリフレッシュトークンがある場合、ボタンのイベントリスナーを更新
+          if (data.refresh_token) {
+            // 既存のクリックイベントを削除して新しいものを追加
+            const newRefreshButton = currentButton.cloneNode(true);
+            newRefreshButton.addEventListener('click', function () {
+              testRefreshToken(data.refresh_token);
+            });
+            newRefreshButton.addEventListener('mouseover', function () {
+              this.style.backgroundColor = '#138496';
+            });
+            newRefreshButton.addEventListener('mouseout', function () {
+              this.style.backgroundColor = '#17a2b8';
+            });
+
+            // ボタンの親要素を確認してから置き換え
+            if (currentButton.parentNode) {
+              currentButton.parentNode.replaceChild(newRefreshButton, currentButton);
+              currentButton = newRefreshButton; // 新しいボタンを現在のボタンとして設定
+              console.log('リフレッシュボタンが新しいトークンで更新されました');
+            }
+          }
+        } else {
+          console.error('リフレッシュトークンテストエラー:', data);
+          refreshResult.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+          refreshResult.style.borderLeft = '4px solid #e74c3c';
+          refreshResult.style.color = '#e74c3c';
+          refreshResult.innerHTML = `
+            <h4>リフレッシュトークンテスト失敗</h4>
+            <pre style="overflow-x: auto; background: #eee; padding: 8px; border-radius: 4px; color: #333;">${JSON.stringify(data, null, 2)}</pre>
+            <p style="margin: 5px 0; color: #333;">リフレッシュトークンが無効または期限切れの可能性があります。</p>
+          `;
+        }
+
+        // 既存のリフレッシュ結果があれば削除
+        const existingResult = document.querySelector('[data-refresh-result]');
+        if (existingResult) {
+          existingResult.remove();
+        }
+
+        refreshResult.setAttribute('data-refresh-result', 'true');
+        if (currentButton.parentElement && currentButton.parentElement.parentElement) {
+          currentButton.parentElement.parentElement.appendChild(refreshResult);
+        }
+
+      } catch (error) {
+        console.error('リフレッシュトークンテスト時に例外が発生:', error);
+
+        const refreshResult = document.createElement('div');
+        refreshResult.style.marginTop = '15px';
+        refreshResult.style.padding = '10px';
+        refreshResult.style.borderRadius = '4px';
+        refreshResult.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+        refreshResult.style.borderLeft = '4px solid #e74c3c';
+        refreshResult.style.color = '#e74c3c';
+        refreshResult.innerHTML = `
+          <h4>通信エラー</h4>
+          <p style="color: #333;">サーバーとの通信中にエラーが発生しました: ${error.message}</p>
+        `;
+
+        // 既存のリフレッシュ結果があれば削除
+        const existingResult = document.querySelector('[data-refresh-result]');
+        if (existingResult) {
+          existingResult.remove();
+        }
+
+        refreshResult.setAttribute('data-refresh-result', 'true');
+        if (currentButton.parentElement && currentButton.parentElement.parentElement) {
+          currentButton.parentElement.parentElement.appendChild(refreshResult);
+        }
+
+      } finally {
+        // ボタンを元に戻す
+        if (currentButton) {
+          currentButton.disabled = false;
+          currentButton.textContent = 'リフレッシュトークンテスト';
+          currentButton.style.backgroundColor = '#17a2b8';
+        }
+      }
+    }
+
+    // ユーザー情報を取得する関数
+    async function fetchUserInfo() {
+      try {
+        // LocalStorageからアクセストークンを取得
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+          showError('認証エラー', 'アクセストークンが見つかりません。先にログインしてください。');
+          return;
+        }
+
+        console.log('ユーザー情報取得開始');
+
+        const response = await fetch('/oauth/userinfo', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        // 結果を表示するエリアを作成
+        const userInfoResult = document.createElement('div');
+        userInfoResult.style.marginTop = '15px';
+        userInfoResult.style.padding = '10px';
+        userInfoResult.style.borderRadius = '4px';
+
+        if (response.ok) {
+          console.log('ユーザー情報取得成功:', data);
+
+          userInfoResult.style.backgroundColor = 'rgba(111, 66, 193, 0.1)';
+          userInfoResult.style.borderLeft = '4px solid #6f42c1';
+          userInfoResult.style.color = '#6f42c1';
+          userInfoResult.innerHTML = `
+            <h4>ユーザー情報取得成功!</h4>
+            <pre style="overflow-x: auto; background: #eee; padding: 8px; border-radius: 4px; color: #333;">${JSON.stringify(data, null, 2)}</pre>
+            <p style="margin: 5px 0; color: #333;">ユーザー情報が正常に取得されました。</p>
+          `;
+        } else {
+          console.error('ユーザー情報取得エラー:', data);
+
+          userInfoResult.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+          userInfoResult.style.borderLeft = '4px solid #e74c3c';
+          userInfoResult.style.color = '#e74c3c';
+
+          let errorMessage = 'ユーザー情報の取得に失敗しました。';
+          if (response.status === 401) {
+            errorMessage = 'アクセストークンが無効または期限切れです。';
+          } else if (response.status === 403) {
+            errorMessage = 'ユーザー情報へのアクセス権限がありません。';
+          }
+
+          userInfoResult.innerHTML = `
+            <h4>ユーザー情報取得失敗</h4>
+            <pre style="overflow-x: auto; background: #eee; padding: 8px; border-radius: 4px; color: #333;">${JSON.stringify(data, null, 2)}</pre>
+            <p style="margin: 5px 0; color: #333;">${errorMessage}</p>
+          `;
+        }
+
+        // 既存のユーザー情報結果があれば削除
+        const existingResult = document.querySelector('[data-userinfo-result]');
+        if (existingResult) {
+          existingResult.remove();
+        }
+
+        userInfoResult.setAttribute('data-userinfo-result', 'true');
+
+        // ボタンの親要素の親要素に結果を追加
+        const buttonContainer = document.querySelector('.container > div:last-child');
+        if (buttonContainer) {
+          buttonContainer.appendChild(userInfoResult);
+        }
+
+      } catch (error) {
+        console.error('ユーザー情報取得時に例外が発生:', error);
+
+        const userInfoResult = document.createElement('div');
+        userInfoResult.style.marginTop = '15px';
+        userInfoResult.style.padding = '10px';
+        userInfoResult.style.borderRadius = '4px';
+        userInfoResult.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
+        userInfoResult.style.borderLeft = '4px solid #e74c3c';
+        userInfoResult.style.color = '#e74c3c';
+        userInfoResult.innerHTML = `
+          <h4>通信エラー</h4>
+          <p style="color: #333;">サーバーとの通信中にエラーが発生しました: ${error.message}</p>
+        `;
+
+        // 既存のユーザー情報結果があれば削除
+        const existingResult = document.querySelector('[data-userinfo-result]');
+        if (existingResult) {
+          existingResult.remove();
+        }
+
+        userInfoResult.setAttribute('data-userinfo-result', 'true');
+
+        const buttonContainer = document.querySelector('.container > div:last-child');
+        if (buttonContainer) {
+          buttonContainer.appendChild(userInfoResult);
+        }
       }
     }
 

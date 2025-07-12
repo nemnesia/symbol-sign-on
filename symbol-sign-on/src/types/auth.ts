@@ -21,6 +21,11 @@ export interface ChallengeDocument {
   redirect_uri?: string
   expires_at?: Date
   createdAt: Date
+  // PKCE関連のフィールド追加
+  code_challenge?: string | null
+  code_challenge_method?: 'S256' | 'plain' | null
+  // CSRF対策用のstate
+  state?: string | null
 }
 
 /**
@@ -34,6 +39,11 @@ export interface AuthCodeDocument {
   used?: boolean
   used_at?: Date
   createdAt: Date
+  // PKCE関連のフィールド追加
+  code_challenge?: string | null
+  code_challenge_method?: 'S256' | 'plain' | null
+  // CSRF対策用のstate
+  state?: string | null
 }
 
 /**

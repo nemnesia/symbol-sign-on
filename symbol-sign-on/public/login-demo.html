@@ -157,6 +157,7 @@
 
         // 成功メッセージを表示
         const successMessage = document.createElement('div');
+        successMessage.id = 'auth-success-message';
         successMessage.style.color = '#27ae60';
         successMessage.style.padding = '15px';
         successMessage.style.margin = '15px 0';
@@ -166,6 +167,13 @@
         successMessage.style.textAlign = 'left';
         successMessage.textContent = `認証に成功しました！認可コード: ${code}`;
         successMessage.setAttribute('data-auth-success', 'true'); // 認証成功のマーカー追加
+
+        // 既にポップアップステータスメッセージがあれば削除
+        const existingStatus = document.getElementById('popup-status');
+        if (existingStatus) {
+          existingStatus.remove();
+        }
+
         document.querySelector('.container').appendChild(successMessage);
 
         // トークンエンドポイントにリクエストを送信
@@ -200,6 +208,7 @@
 
         // 認証成功メッセージを表示
         const successMessage = document.createElement('div');
+        successMessage.id = 'auth-success-message';
         successMessage.style.color = '#27ae60';
         successMessage.style.padding = '15px';
         successMessage.style.margin = '15px 0';
@@ -208,6 +217,14 @@
         successMessage.style.borderLeft = '4px solid #27ae60';
         successMessage.style.textAlign = 'left';
         successMessage.textContent = '認証に成功しました！認可コードを取得しました。';
+        successMessage.setAttribute('data-auth-success', 'true'); // 認証成功のマーカー追加
+
+        // 既にポップアップステータスメッセージがあれば削除
+        const existingStatus = document.getElementById('popup-status');
+        if (existingStatus) {
+          existingStatus.remove();
+        }
+
         document.querySelector('.container').appendChild(successMessage);
 
         // トークンエンドポイントへのリクエスト実行
@@ -258,8 +275,12 @@
 
     // ポップアップパターンの処理
     document.getElementById('popup-login').addEventListener('click', function () {
-      // エラーメッセージをクリア
+      // エラーメッセージとすべての通知メッセージをクリア
       document.getElementById('error-message').style.display = 'none';
+
+      // 以前の認証関連メッセージをすべてクリア
+      const previousMessages = document.querySelectorAll('[data-auth-success], #popup-status');
+      previousMessages.forEach(element => element.remove());
 
       // ボタンの状態を変更して処理中を示す
       const button = this;
@@ -290,6 +311,12 @@
       // ユニークな状態識別子を生成
       const state = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
+      // 以前の認証結果メッセージをクリア
+      const previousAuthMessage = document.getElementById('auth-success-message');
+      if (previousAuthMessage) {
+        previousAuthMessage.remove();
+      }
+
       // ポップアップを開く
       const popup = window.open(
         `/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent('http://localhost:3510/login-demo.html')}&popup=true&display=popup&state=${state}&popup_width=${popupWidth}&popup_height=${popupHeight}`,
@@ -306,13 +333,25 @@
           button.textContent = 'ポップアップでログイン';
           button.style.backgroundColor = '#5200c6';
 
-          // ステータスメッセージを更新（認証コードを受け取っていない場合のみ）
-          const statusMsg = document.getElementById('popup-status');
-          if (statusMsg && !document.querySelector('[data-auth-success="true"]')) {
-            statusMsg.style.backgroundColor = '#f8d7da';
-            statusMsg.style.color = '#721c24';
-            statusMsg.style.borderColor = '#f5c6cb';
-            statusMsg.textContent = 'ポップアップが閉じられました。認証が完了していない可能性があります。';
+          // 認証成功フラグをチェック
+          const hasAuthSuccess = document.querySelector('[data-auth-success="true"]') !== null;
+
+          // 既に成功メッセージがある場合は何もしない
+          if (hasAuthSuccess) {
+            // ステータスメッセージを削除して、成功メッセージだけを残す
+            const statusMsg = document.getElementById('popup-status');
+            if (statusMsg) {
+              statusMsg.remove();
+            }
+          } else {
+            // 認証成功していない場合のみエラーメッセージを表示
+            const statusMsg = document.getElementById('popup-status');
+            if (statusMsg) {
+              statusMsg.style.backgroundColor = '#f8d7da';
+              statusMsg.style.color = '#721c24';
+              statusMsg.style.borderColor = '#f5c6cb';
+              statusMsg.textContent = 'ポップアップが閉じられました。認証が完了していない可能性があります。';
+            }
           }
         }
       }, 500);
@@ -322,6 +361,18 @@
     document.getElementById('redirect-login').addEventListener('click', function () {
       // エラーメッセージをクリア
       document.getElementById('error-message').style.display = 'none';
+
+      // 以前の認証結果メッセージをクリア
+      const previousAuthMessage = document.getElementById('auth-success-message');
+      if (previousAuthMessage) {
+        previousAuthMessage.remove();
+      }
+
+      // 既存のポップアップステータスメッセージをクリア
+      const existingStatus = document.getElementById('popup-status');
+      if (existingStatus) {
+        existingStatus.remove();
+      }
 
       // 状態を表示
       const statusMessage = document.createElement('div');

@@ -3,45 +3,38 @@ import { v4 as uuidv4 } from 'uuid'
 import { AuthCodes, Challenges, Tokens, Clients } from '../db/database.js'
 import logger from '../utils/logger.js'
 import { utils } from 'symbol-sdk'
-import {
-  models,
-  SymbolFacade,
-  SymbolTransactionFactory,
-} from 'symbol-sdk/symbol'
-import {
-  AuthCodeDocument,
-  ChallengeDocument
-} from '../types/auth.js'
+import { models, SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
+import { AuthCodeDocument, ChallengeDocument } from '../types/auth.js'
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'development_fallback_jwt_secret' // .envファイルから読み込む
 
 // 時間形式(例: 1h, 30m)を秒数に変換する関数
 function parseTimeToSeconds(timeStr: string): number {
-  const defaultSeconds = 3600; // デフォルト: 1時間
+  const defaultSeconds = 3600 // デフォルト: 1時間
 
-  if (!timeStr) return defaultSeconds;
+  if (!timeStr) return defaultSeconds
 
   // 数値のみの場合は秒数として解釈
   if (/^\d+$/.test(timeStr)) {
-    return parseInt(timeStr, 10);
+    return parseInt(timeStr, 10)
   }
 
   // 時間表記（例: 1h, 30m）を解釈
-  const hours = timeStr.match(/(\d+)h/);
-  const minutes = timeStr.match(/(\d+)m/);
-  const seconds = timeStr.match(/(\d+)s/);
+  const hours = timeStr.match(/(\d+)h/)
+  const minutes = timeStr.match(/(\d+)m/)
+  const seconds = timeStr.match(/(\d+)s/)
 
-  let totalSeconds = 0;
-  if (hours) totalSeconds += parseInt(hours[1], 10) * 3600;
-  if (minutes) totalSeconds += parseInt(minutes[1], 10) * 60;
-  if (seconds) totalSeconds += parseInt(seconds[1], 10);
+  let totalSeconds = 0
+  if (hours) totalSeconds += parseInt(hours[1], 10) * 3600
+  if (minutes) totalSeconds += parseInt(minutes[1], 10) * 60
+  if (seconds) totalSeconds += parseInt(seconds[1], 10)
 
-  return totalSeconds > 0 ? totalSeconds : defaultSeconds;
+  return totalSeconds > 0 ? totalSeconds : defaultSeconds
 }
 
 // JWT有効期限を秒数で取得
-const JWT_EXPIRES_IN = parseTimeToSeconds(process.env.JWT_EXPIRES_IN || '1h');
+const JWT_EXPIRES_IN = parseTimeToSeconds(process.env.JWT_EXPIRES_IN || '1h')
 
 // 環境変数チェック
 if (!process.env.JWT_SECRET) {
@@ -55,7 +48,7 @@ logger.info(`JWT設定: 有効期限=${JWT_EXPIRES_IN}秒`)
 function generateJWT(payload: object): string {
   return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
-    algorithm: 'HS256'
+    algorithm: 'HS256',
   })
 }
 
@@ -80,8 +73,8 @@ async function cleanupExpiredTokens() {
       $or: [
         { expires_at: { $lt: now } }, // 期限切れ
         { revoked: { $eq: true } }, // 無効化済み
-        { used: true, used_at: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } // 使用済みで24時間経過
-      ]
+        { used: true, used_at: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, // 使用済みで24時間経過
+      ],
     })
 
     if (result.deletedCount > 0) {
@@ -100,8 +93,8 @@ async function cleanupExpiredAuthCodes() {
     const result = await AuthCodes.deleteMany({
       $or: [
         { expires_at: { $lt: now } }, // 期限切れ
-        { used: true, used_at: { $lt: new Date(Date.now() - 60 * 60 * 1000) } } // 使用済みで1時間経過
-      ]
+        { used: true, used_at: { $lt: new Date(Date.now() - 60 * 60 * 1000) } }, // 使用済みで1時間経過
+      ],
     })
 
     if (result.deletedCount > 0) {
@@ -118,7 +111,7 @@ async function cleanupExpiredChallenges() {
     const now = new Date()
 
     const result = await Challenges.deleteMany({
-      expires_at: { $lt: now }
+      expires_at: { $lt: now },
     })
 
     if (result.deletedCount > 0) {
@@ -132,12 +125,15 @@ async function cleanupExpiredChallenges() {
 // 定期クリーンアップの開始
 function startPeriodicCleanup() {
   // 1時間ごとにクリーンアップを実行
-  setInterval(async () => {
-    logger.debug('Starting periodic cleanup of expired records')
-    await cleanupExpiredTokens()
-    await cleanupExpiredAuthCodes()
-    await cleanupExpiredChallenges()
-  }, 60 * 60 * 1000) // 1時間
+  setInterval(
+    async () => {
+      logger.debug('Starting periodic cleanup of expired records')
+      await cleanupExpiredTokens()
+      await cleanupExpiredAuthCodes()
+      await cleanupExpiredChallenges()
+    },
+    60 * 60 * 1000,
+  ) // 1時間
 
   // 起動時にも一度実行
   setTimeout(async () => {
@@ -155,19 +151,13 @@ const router = Router()
 
 router.get('/authorize', async (req, res) => {
   try {
-    const {
-      response_type,
-      client_id,
-      redirect_uri,
-      display,
-      popup,
-      code_challenge,
-      code_challenge_method,
-      state
-    } = req.query
+    const { response_type, client_id, redirect_uri, display, popup, code_challenge, code_challenge_method, state } =
+      req.query
 
     // クエリパラメータの出力は最小限にする（client_id, state, code_challengeなどを含まないように）
-    logger.debug(`/oauth/authorize request received - response_type: ${response_type || 'none'}, display: ${display || 'standard'}`)
+    logger.debug(
+      `/oauth/authorize request received - response_type: ${response_type || 'none'}, display: ${display || 'standard'}`,
+    )
     // ポップアップモードの検出
     const isPopupRequest = display === 'popup' || popup === 'true'
     if (isPopupRequest) {
@@ -181,12 +171,13 @@ router.get('/authorize', async (req, res) => {
       logger.info(`PKCE flow detected, code_challenge: ${code_challenge}`)
 
       // code_challenge_methodの検証
-      validChallengeMethod = !code_challenge_method || code_challenge_method === 'S256' || code_challenge_method === 'plain'
+      validChallengeMethod =
+        !code_challenge_method || code_challenge_method === 'S256' || code_challenge_method === 'plain'
       if (!validChallengeMethod) {
         logger.error(`/oauth/authorize invalid code_challenge_method: ${code_challenge_method}`)
         return res.status(400).json({
           error: 'invalid_request',
-          error_description: "Invalid code_challenge_method. Supported values are 'S256' and 'plain'"
+          error_description: "Invalid code_challenge_method. Supported values are 'S256' and 'plain'",
         })
       }
     }
@@ -198,16 +189,13 @@ router.get('/authorize', async (req, res) => {
       )
       return res.status(400).json({
         error: 'invalid_request',
-        error_description:
-          'Missing required parameters: response_type, client_id, redirect_uri',
+        error_description: 'Missing required parameters: response_type, client_id, redirect_uri',
       })
     }
 
     // response_typeは'code'のみサポート
     if (response_type !== 'code') {
-      logger.error(
-        `/oauth/authorize unsupported response_type: ${response_type}`,
-      )
+      logger.error(`/oauth/authorize unsupported response_type: ${response_type}`)
       return res.status(400).json({
         error: 'unsupported_response_type',
         error_description: "Only 'code' response_type is supported",
@@ -221,20 +209,15 @@ router.get('/authorize', async (req, res) => {
         client_id: client_id as string,
       })
       if (!client || !client.trusted_redirect_uris) {
-        logger.error(
-          `/oauth/authorize client not found or has no trusted URIs: client_id=${client_id}`,
-        )
+        logger.error(`/oauth/authorize client not found or has no trusted URIs: client_id=${client_id}`)
         return res.status(400).json({
           error: 'unauthorized_client',
-          error_description:
-            'Client ID is not registered or has no trusted URIs',
+          error_description: 'Client ID is not registered or has no trusted URIs',
         })
       }
       registeredRedirectUri = client.trusted_redirect_uris
     } catch {
-      logger.error(
-        `/oauth/authorize database error while fetching client: client_id=${client_id}`,
-      )
+      logger.error(`/oauth/authorize database error while fetching client: client_id=${client_id}`)
       return res.status(500).json({
         error: 'server_error',
         error_description: 'Failed to fetch client data',
@@ -242,9 +225,7 @@ router.get('/authorize', async (req, res) => {
     }
 
     if (!registeredRedirectUri.includes(redirect_uri as string)) {
-      logger.error(
-        `/oauth/authorize redirect_uri does not match any trusted URIs: ${redirect_uri}`,
-      )
+      logger.error(`/oauth/authorize redirect_uri does not match any trusted URIs: ${redirect_uri}`)
       return res.status(400).json({
         error: 'invalid_request',
         error_description: 'redirect_uri does not match any trusted URIs',
@@ -263,20 +244,20 @@ router.get('/authorize', async (req, res) => {
         redirect_uri: redirect_uri as string,
         expires_at: expiresAt,
         createdAt: new Date(),
-      };
+      }
 
       // PKCE用のパラメータを保存
       if (code_challenge) {
-        challengeData.code_challenge = code_challenge as string;
-        challengeData.code_challenge_method = (code_challenge_method as string === 'S256' ? 'S256' : 'plain');
+        challengeData.code_challenge = code_challenge as string
+        challengeData.code_challenge_method = (code_challenge_method as string) === 'S256' ? 'S256' : 'plain'
       }
 
       // CSRF対策用のstateパラメータ
       if (state) {
-        challengeData.state = state as string;
+        challengeData.state = state as string
       }
 
-      await Challenges.insertOne(challengeData);
+      await Challenges.insertOne(challengeData)
     } catch {
       logger.error(
         `/oauth/authorize database error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}`,
@@ -314,7 +295,9 @@ router.put('/verify-signature', async (req, res) => {
     // 署名済みトランザクションの検証
     const tx = SymbolTransactionFactory.deserialize(utils.hexToUint8(payload))
     // トランザクション詳細はセキュリティ上重要な情報を含むため最小限のログにする
-    logger.debug(`Transaction received, network: ${models.NetworkType.valueToKey(tx.network.value)}, type: ${tx.type.value}`)
+    logger.debug(
+      `Transaction received, network: ${models.NetworkType.valueToKey(tx.network.value)}, type: ${tx.type.value}`,
+    )
     const networkName = models.NetworkType.valueToKey(tx.network.value)
     const facade = new SymbolFacade(networkName.toLowerCase())
     const isSignatureValid = facade.verifyTransaction(tx, tx.signature)
@@ -350,9 +333,7 @@ router.put('/verify-signature', async (req, res) => {
         }
       }
     } catch (error) {
-      logger.error(
-        `Failed to extract challenge from transaction: ${(error as Error).message}`,
-      )
+      logger.error(`Failed to extract challenge from transaction: ${(error as Error).message}`)
       return res.status(400).json({ error: 'Invalid transaction format' })
     }
 
@@ -389,21 +370,21 @@ router.put('/verify-signature', async (req, res) => {
         expires_at: new Date(Date.now() + expiresIn * 1000),
         used: false,
         createdAt: new Date(),
-      };
+      }
 
       // PKCE関連の情報があれば追加（型安全に）
-      const challengeDoc2 = challengeDoc as ChallengeDocument;
+      const challengeDoc2 = challengeDoc as ChallengeDocument
       if (challengeDoc2.code_challenge) {
-        authCodeData.code_challenge = challengeDoc2.code_challenge;
-        authCodeData.code_challenge_method = challengeDoc2.code_challenge_method;
+        authCodeData.code_challenge = challengeDoc2.code_challenge
+        authCodeData.code_challenge_method = challengeDoc2.code_challenge_method
       }
 
       // state情報があれば追加
       if (challengeDoc2.state) {
-        authCodeData.state = challengeDoc2.state;
+        authCodeData.state = challengeDoc2.state
       }
 
-      await AuthCodes.insertOne(authCodeData);
+      await AuthCodes.insertOne(authCodeData)
     } catch (dbError) {
       logger.error(`Failed to store auth code: ${(dbError as Error).message}`)
       return res.status(500).json({ error: 'Database connection error' })
@@ -424,17 +405,17 @@ router.put('/verify-signature', async (req, res) => {
         redirectUrl.searchParams.set('code', code)
 
         // stateパラメータがある場合は引き継ぐ（CSRF対策）
-        const challengeDoc2 = challengeDoc as ChallengeDocument;
+        const challengeDoc2 = challengeDoc as ChallengeDocument
         if (challengeDoc2.state) {
-          redirectUrl.searchParams.set('state', challengeDoc2.state);
-          logger.debug(`Including state parameter in redirect (value omitted)`);
+          redirectUrl.searchParams.set('state', challengeDoc2.state)
+          logger.debug(`Including state parameter in redirect (value omitted)`)
         }
 
         // ポップアップからのリクエストの場合はpostMessageで親ウィンドウに結果を送信
         const referer = req.get('Referer')
         // リファラー情報はセキュリティ上重要なのでログに出さない
         // ポップアップ判定ロジックの改善
-        const isPopup = (
+        const isPopup =
           // 明示的なポップアップパラメータ
           req.query.popup === 'true' ||
           req.query.display === 'popup' ||
@@ -443,17 +424,15 @@ router.put('/verify-signature', async (req, res) => {
           // 特定のポップアップウィンドウの特徴
           (req.headers['sec-fetch-dest'] === 'document' && req.headers['sec-fetch-mode'] === 'navigate') ||
           // リファラーベースの判定（より具体的に）
-          (referer && (
-            referer.includes('oauth_popup') ||
-            referer.includes('popup=true') ||
-            referer.includes('display=popup') ||
-            // 'authorize'を含むが、より具体的な判定
-            (referer.includes('authorize') && referer.includes('window.open'))
-          )) ||
+          (referer &&
+            (referer.includes('oauth_popup') ||
+              referer.includes('popup=true') ||
+              referer.includes('display=popup') ||
+              // 'authorize'を含むが、より具体的な判定
+              (referer.includes('authorize') && referer.includes('window.open')))) ||
           // ウィンドウサイズがポップアップに典型的なサイズかチェック
           req.query.popup_height !== undefined ||
           req.query.popup_width !== undefined
-        )
 
         // ポップアップ関連のログは最小限に抑える
         logger.debug(`isPopup: ${isPopup}, mode: ${req.headers['sec-fetch-mode'] || 'unknown'}`)
@@ -533,12 +512,10 @@ router.put('/verify-signature', async (req, res) => {
     window.location.replace('${redirectUrl.toString()}');
   </script>
 </body>
-</html>`);
+</html>`)
         }
       } catch (redirectError) {
-        logger.error(
-          `Invalid redirect_uri: ${(redirectError as Error).message}`,
-        )
+        logger.error(`Invalid redirect_uri: ${(redirectError as Error).message}`)
         // redirect_uriが無効な場合はJSONレスポンスにフォールバック
       }
     }
@@ -576,54 +553,54 @@ router.post('/token', async (req, res) => {
       }
 
       // 型安全な処理
-      const authCode2 = authCode as AuthCodeDocument;
+      const authCode2 = authCode as AuthCodeDocument
 
       // PKCE検証 (アプリに実装されている場合)
       if (authCode2.code_challenge) {
         if (!code_verifier) {
-          logger.error('Missing code_verifier for PKCE flow');
+          logger.error('Missing code_verifier for PKCE flow')
           return res.status(400).json({
             error: 'invalid_grant',
-            error_description: 'PKCE code_verifier is required but was not supplied'
-          });
+            error_description: 'PKCE code_verifier is required but was not supplied',
+          })
         }
 
         // S256の場合はハッシュ化して比較
-        let calculatedChallenge;
+        let calculatedChallenge
         if (authCode2.code_challenge_method === 'S256') {
           try {
             // 注: 本番実装では crypto モジュールが必要
             // この例ではシンプルにするためハッシュ計算はスタブ化
-            logger.warn('PKCE S256ハッシュ計算は実際の実装が必要です');
-            calculatedChallenge = code_verifier; // 実際の実装ではS256ハッシュを計算
+            logger.warn('PKCE S256ハッシュ計算は実際の実装が必要です')
+            calculatedChallenge = code_verifier // 実際の実装ではS256ハッシュを計算
           } catch (err) {
-            logger.error(`PKCE S256 calculation error: ${err instanceof Error ? err.message : err}`);
-            return res.status(500).json({ error: 'server_error', error_description: 'Failed to verify code challenge' });
+            logger.error(`PKCE S256 calculation error: ${err instanceof Error ? err.message : err}`)
+            return res.status(500).json({ error: 'server_error', error_description: 'Failed to verify code challenge' })
           }
         } else {
           // Plain method
-          calculatedChallenge = code_verifier;
+          calculatedChallenge = code_verifier
         }
 
         if (calculatedChallenge !== authCode2.code_challenge) {
           // 値そのものはログに出さない
-          logger.error(`PKCE verification failed: code_verifier does not match code_challenge`);
+          logger.error(`PKCE verification failed: code_verifier does not match code_challenge`)
           return res.status(400).json({
             error: 'invalid_grant',
-            error_description: 'code_verifier does not match code_challenge'
-          });
+            error_description: 'code_verifier does not match code_challenge',
+          })
         }
 
-        logger.info('PKCE verification successful');
+        logger.info('PKCE verification successful')
       }
 
       // stateパラメータの検証
       if (state && authCode2.state && state !== authCode2.state) {
-        logger.error(`State parameter mismatch: ${state} !== ${authCode2.state}`);
+        logger.error(`State parameter mismatch: ${state} !== ${authCode2.state}`)
         return res.status(400).json({
           error: 'invalid_grant',
-          error_description: 'state parameter does not match'
-        });
+          error_description: 'state parameter does not match',
+        })
       }
       // JWTを生成
       const jwtPayload = {
@@ -632,7 +609,7 @@ router.post('/token', async (req, res) => {
         client_id: client_id, // クライアントID
         iat: Math.floor(Date.now() / 1000), // 発行時刻
         jti: uuidv4(), // JWT ID - 一意性を保証
-        type: 'access_token' // トークンタイプ
+        type: 'access_token', // トークンタイプ
       }
 
       const accessToken = generateJWT(jwtPayload)
@@ -640,14 +617,9 @@ router.post('/token', async (req, res) => {
       const expiresIn = JWT_EXPIRES_IN
       // 認可コードをusedに
       try {
-        await AuthCodes.updateOne(
-          { code },
-          { $set: { used: true, used_at: new Date() } },
-        )
+        await AuthCodes.updateOne({ code }, { $set: { used: true, used_at: new Date() } })
       } catch (dbError) {
-        logger.error(
-          `Failed to update auth code: ${(dbError as Error).message}`,
-        )
+        logger.error(`Failed to update auth code: ${(dbError as Error).message}`)
         // 非致命的エラーなので続行
       }
 
@@ -663,9 +635,7 @@ router.post('/token', async (req, res) => {
           createdAt: new Date(),
         })
       } catch (dbError) {
-        logger.error(
-          `Failed to store refresh token: ${(dbError as Error).message}`,
-        )
+        logger.error(`Failed to store refresh token: ${(dbError as Error).message}`)
         // リフレッシュトークン保存失敗は致命的ではないので続行
       }
       // トークン発行成功のログ（トークン値は出力しない）
@@ -677,9 +647,7 @@ router.post('/token', async (req, res) => {
       })
     } else if (grant_type === 'refresh_token') {
       if (!refresh_token || !client_id) {
-        return res
-          .status(400)
-          .json({ error: 'Missing refresh_token or client_id' })
+        return res.status(400).json({ error: 'Missing refresh_token or client_id' })
       }
       // リフレッシュトークン有効性チェック
       let tokenDoc
@@ -690,10 +658,8 @@ router.post('/token', async (req, res) => {
         return res.status(500).json({ error: 'Database connection error' })
       }
 
-      if (!tokenDoc || tokenDoc.used || (tokenDoc.revoked === true)) {
-        return res
-          .status(400)
-          .json({ error: 'Invalid or used/expired refresh_token' })
+      if (!tokenDoc || tokenDoc.used || tokenDoc.revoked === true) {
+        return res.status(400).json({ error: 'Invalid or used/expired refresh_token' })
       }
       // 新しいJWT/リフレッシュトークン発行
       const jwtPayload = {
@@ -703,7 +669,7 @@ router.post('/token', async (req, res) => {
         iat: Math.floor(Date.now() / 1000), // 発行時刻
         jti: uuidv4(), // JWT ID - 一意性を保証
         type: 'access_token', // トークンタイプ
-        refresh: true // リフレッシュから発行されたトークン
+        refresh: true, // リフレッシュから発行されたトークン
       }
 
       const accessToken = generateJWT(jwtPayload)
@@ -730,9 +696,7 @@ router.post('/token', async (req, res) => {
           createdAt: new Date(),
         })
       } catch (dbError) {
-        logger.error(
-          `Failed to store new refresh token: ${(dbError as Error).message}`,
-        )
+        logger.error(`Failed to store new refresh token: ${(dbError as Error).message}`)
         // リフレッシュトークン保存失敗は致命的ではないので続行
       }
       // リフレッシュトークンによる再発行成功のログ（トークン値は出力しない）
@@ -755,9 +719,7 @@ router.get('/userinfo', async (req, res) => {
   try {
     const auth = req.headers['authorization']
     if (!auth || !auth.startsWith('Bearer ')) {
-      return res
-        .status(401)
-        .json({ error: 'Missing or invalid Authorization header' })
+      return res.status(401).json({ error: 'Missing or invalid Authorization header' })
     }
 
     // トークンを取得して検証（トークン値はログに出さない）
@@ -769,7 +731,7 @@ router.get('/userinfo', async (req, res) => {
     if (!decodedToken) {
       return res.status(401).json({
         error: 'invalid_token',
-        error_description: 'The access token is invalid or has expired'
+        error_description: 'The access token is invalid or has expired',
       })
     }
 
@@ -804,7 +766,7 @@ router.post('/revoke', async (req, res) => {
               revoked: true,
               revoked_at: new Date(),
             },
-          }
+          },
         )
 
         if (result.modifiedCount > 0) {
@@ -830,7 +792,7 @@ router.post('/revoke', async (req, res) => {
                 revoked: true,
                 revoked_at: new Date(),
               },
-            }
+            },
           )
 
           if (result.modifiedCount > 0) {
@@ -845,7 +807,6 @@ router.post('/revoke', async (req, res) => {
 
     // OAuth2 RFC 7009準拠: 成功レスポンス（トークンが見つからなくても200を返す）
     res.status(200).json({ success: true })
-
   } catch (err) {
     logger.error(`/oauth/revoke error: ${(err as Error).message}`)
     res.status(500).json({ error: 'Internal server error' })

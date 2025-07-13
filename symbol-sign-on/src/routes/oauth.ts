@@ -70,6 +70,87 @@ function verifyJWT(token: string): any {
   }
 }
 
+// 期限切れトークンを削除する関数
+async function cleanupExpiredTokens() {
+  try {
+    const now = new Date()
+
+    // 期限切れのリフレッシュトークンを削除
+    const result = await Tokens.deleteMany({
+      $or: [
+        { expires_at: { $lt: now } }, // 期限切れ
+        { revoked: { $eq: true } }, // 無効化済み
+        { used: true, used_at: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } // 使用済みで24時間経過
+      ]
+    })
+
+    if (result.deletedCount > 0) {
+      logger.info(`Cleaned up ${result.deletedCount} expired/revoked tokens`)
+    }
+  } catch (error) {
+    logger.error(`Token cleanup error: ${(error as Error).message}`)
+  }
+}
+
+// 期限切れ認可コードを削除する関数
+async function cleanupExpiredAuthCodes() {
+  try {
+    const now = new Date()
+
+    const result = await AuthCodes.deleteMany({
+      $or: [
+        { expires_at: { $lt: now } }, // 期限切れ
+        { used: true, used_at: { $lt: new Date(Date.now() - 60 * 60 * 1000) } } // 使用済みで1時間経過
+      ]
+    })
+
+    if (result.deletedCount > 0) {
+      logger.info(`Cleaned up ${result.deletedCount} expired/used auth codes`)
+    }
+  } catch (error) {
+    logger.error(`Auth code cleanup error: ${(error as Error).message}`)
+  }
+}
+
+// 期限切れチャレンジを削除する関数
+async function cleanupExpiredChallenges() {
+  try {
+    const now = new Date()
+
+    const result = await Challenges.deleteMany({
+      expires_at: { $lt: now }
+    })
+
+    if (result.deletedCount > 0) {
+      logger.info(`Cleaned up ${result.deletedCount} expired challenges`)
+    }
+  } catch (error) {
+    logger.error(`Challenge cleanup error: ${(error as Error).message}`)
+  }
+}
+
+// 定期クリーンアップの開始
+function startPeriodicCleanup() {
+  // 1時間ごとにクリーンアップを実行
+  setInterval(async () => {
+    logger.debug('Starting periodic cleanup of expired records')
+    await cleanupExpiredTokens()
+    await cleanupExpiredAuthCodes()
+    await cleanupExpiredChallenges()
+  }, 60 * 60 * 1000) // 1時間
+
+  // 起動時にも一度実行
+  setTimeout(async () => {
+    logger.info('Performing initial cleanup on startup')
+    await cleanupExpiredTokens()
+    await cleanupExpiredAuthCodes()
+    await cleanupExpiredChallenges()
+  }, 5000) // 5秒後
+}
+
+// サーバー起動時にクリーンアップを開始（この関数をapp.tsで呼び出す必要があります）
+export { startPeriodicCleanup }
+
 const router = Router()
 
 router.get('/authorize', async (req, res) => {
@@ -609,7 +690,7 @@ router.post('/token', async (req, res) => {
         return res.status(500).json({ error: 'Database connection error' })
       }
 
-      if (!tokenDoc || tokenDoc.used || tokenDoc.revoked) {
+      if (!tokenDoc || tokenDoc.used || (tokenDoc.revoked === true)) {
         return res
           .status(400)
           .json({ error: 'Invalid or used/expired refresh_token' })
@@ -628,14 +709,12 @@ router.post('/token', async (req, res) => {
       const accessToken = generateJWT(jwtPayload)
       const newRefreshToken = uuidv4()
       const expiresIn = JWT_EXPIRES_IN
-      // 古いトークンをusedに
+      // 古いトークンを削除（セキュリティ向上のため物理削除）
       try {
-        await Tokens.updateOne(
-          { refresh_token },
-          { $set: { used: true, used_at: new Date() } },
-        )
+        await Tokens.deleteOne({ refresh_token })
+        logger.debug('Old refresh token deleted successfully')
       } catch (dbError) {
-        logger.error(`Failed to update token: ${(dbError as Error).message}`)
+        logger.error(`Failed to delete old token: ${(dbError as Error).message}`)
         // 非致命的エラーなので続行
       }
 
@@ -701,6 +780,74 @@ router.get('/userinfo', async (req, res) => {
     res.json({ address, publicKey, network })
   } catch (err) {
     logger.error(`/oauth/userinfo error: ${(err as Error).message}`)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/revoke', async (req, res) => {
+  try {
+    const { token, token_type_hint } = req.body
+
+    if (!token) {
+      return res.status(400).json({ error: 'Missing token parameter' })
+    }
+
+    let revokeResult = false
+
+    // リフレッシュトークンの無効化
+    if (!token_type_hint || token_type_hint === 'refresh_token') {
+      try {
+        const result = await Tokens.updateOne(
+          { refresh_token: token, revoked: { $ne: true } },
+          {
+            $set: {
+              revoked: true,
+              revoked_at: new Date(),
+            },
+          }
+        )
+
+        if (result.modifiedCount > 0) {
+          logger.info('Refresh token revoked successfully')
+          revokeResult = true
+        }
+      } catch (dbError) {
+        logger.error(`Failed to revoke refresh token: ${(dbError as Error).message}`)
+      }
+    }
+
+    // アクセストークンの場合はJWT検証後、関連するリフレッシュトークンを無効化
+    if (!revokeResult && (!token_type_hint || token_type_hint === 'access_token')) {
+      try {
+        const decodedToken = verifyJWT(token)
+
+        if (decodedToken && decodedToken.sub) {
+          // このユーザーの全リフレッシュトークンを無効化
+          const result = await Tokens.updateMany(
+            { address: decodedToken.sub, revoked: { $ne: true } },
+            {
+              $set: {
+                revoked: true,
+                revoked_at: new Date(),
+              },
+            }
+          )
+
+          if (result.modifiedCount > 0) {
+            logger.info(`Revoked ${result.modifiedCount} refresh tokens for user`)
+            revokeResult = true
+          }
+        }
+      } catch {
+        logger.debug('Token revocation: Invalid access token provided')
+      }
+    }
+
+    // OAuth2 RFC 7009準拠: 成功レスポンス（トークンが見つからなくても200を返す）
+    res.status(200).json({ success: true })
+
+  } catch (err) {
+    logger.error(`/oauth/revoke error: ${(err as Error).message}`)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

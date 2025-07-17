@@ -6,6 +6,7 @@ import { utils } from 'symbol-sdk'
 import { models, SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { AuthCodeDocument, ChallengeDocument } from '../types/auth.js'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'development_fallback_jwt_secret' // .envファイルから読み込む
 
@@ -52,10 +53,21 @@ function generateJWT(payload: object): string {
   })
 }
 
+// JWTペイロードの型定義
+interface JWTPayload {
+  sub: string // アドレス
+  pub: string // 公開鍵
+  client_id: string
+  iat: number
+  jti: string
+  type: 'access_token'
+  refresh?: boolean
+}
+
 // JWTを検証する関数
-function verifyJWT(token: string): any {
+function verifyJWT(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET)
+    return jwt.verify(token, JWT_SECRET) as JWTPayload
   } catch {
     // エラーメッセージからトークン自体の値が漏れないようにする
     logger.error(`JWT verification error: Token invalid or expired`)
@@ -122,6 +134,51 @@ async function cleanupExpiredChallenges() {
   }
 }
 
+/**
+ * PKCE code_challengeを計算する関数
+ */
+function calculatePKCEChallenge(verifier: string, method: 'S256' | 'plain'): string {
+  if (method === 'plain') {
+    return verifier
+  } else if (method === 'S256') {
+    return crypto
+      .createHash('sha256')
+      .update(verifier)
+      .digest('base64url')
+  } else {
+    throw new Error(`Unsupported PKCE method: ${method}`)
+  }
+}
+
+/**
+ * ポップアップリクエストかどうかを判定する関数
+ */
+function isPopupRequest(req: any): boolean {
+  const { query, headers } = req
+
+  // 明示的なポップアップパラメータ
+  if (query.display === 'popup' || query.popup === 'true') {
+    return true
+  }
+
+  // ヘッダーベースの判定
+  if (headers['x-requested-with'] === 'popup') {
+    return true
+  }
+
+  // リファラーベースの判定
+  const referer = headers.referer || headers.referrer
+  if (referer && (
+    referer.includes('oauth_popup') ||
+    referer.includes('popup=true') ||
+    referer.includes('display=popup')
+  )) {
+    return true
+  }
+
+  return false
+}
+
 // 定期クリーンアップの開始
 function startPeriodicCleanup() {
   // 1時間ごとにクリーンアップを実行
@@ -151,7 +208,7 @@ const router = Router()
 
 router.get('/authorize', async (req, res) => {
   try {
-    const { response_type, client_id, redirect_uri, display, popup, code_challenge, code_challenge_method, state } =
+    const { response_type, client_id, redirect_uri, display, code_challenge, code_challenge_method, state } =
       req.query
 
     // クエリパラメータの出力は最小限にする（client_id, state, code_challengeなどを含まないように）
@@ -159,8 +216,8 @@ router.get('/authorize', async (req, res) => {
       `/oauth/authorize request received - response_type: ${response_type || 'none'}, display: ${display || 'standard'}`,
     )
     // ポップアップモードの検出
-    const isPopupRequest = display === 'popup' || popup === 'true'
-    if (isPopupRequest) {
+    const isPopup = isPopupRequest(req)
+    if (isPopup) {
       logger.info(`Popup authorization flow detected`)
     }
 
@@ -320,8 +377,11 @@ router.put('/verify-signature', async (req, res) => {
     try {
       if (tx.type.value === 16724) {
         // Transfer transaction
-        // TransferTransactionにキャストしてメッセージにアクセス
-        const transferTx = tx as any
+        // 型安全なキャストを行う
+        interface TransferTransaction {
+          message?: Uint8Array
+        }
+        const transferTx = tx as TransferTransaction
         if (transferTx.message && transferTx.message.length > 0) {
           const messageHex = utils.uint8ToHex(transferTx.message)
           // メッセージからnull文字で始まるチャレンジを抽出
@@ -412,31 +472,9 @@ router.put('/verify-signature', async (req, res) => {
         }
 
         // ポップアップからのリクエストの場合はpostMessageで親ウィンドウに結果を送信
-        const referer = req.get('Referer')
-        // リファラー情報はセキュリティ上重要なのでログに出さない
-        // ポップアップ判定ロジックの改善
-        const isPopup =
-          // 明示的なポップアップパラメータ
-          req.query.popup === 'true' ||
-          req.query.display === 'popup' ||
-          // ヘッダーベースの判定
-          req.headers['x-requested-with'] === 'popup' ||
-          // 特定のポップアップウィンドウの特徴
-          (req.headers['sec-fetch-dest'] === 'document' && req.headers['sec-fetch-mode'] === 'navigate') ||
-          // リファラーベースの判定（より具体的に）
-          (referer &&
-            (referer.includes('oauth_popup') ||
-              referer.includes('popup=true') ||
-              referer.includes('display=popup') ||
-              // 'authorize'を含むが、より具体的な判定
-              (referer.includes('authorize') && referer.includes('window.open')))) ||
-          // ウィンドウサイズがポップアップに典型的なサイズかチェック
-          req.query.popup_height !== undefined ||
-          req.query.popup_width !== undefined
+        const isPopup = isPopupRequest(req)
 
-        // ポップアップ関連のログは最小限に抑える
-        logger.debug(`isPopup: ${isPopup}, mode: ${req.headers['sec-fetch-mode'] || 'unknown'}`)
-        // user-agentはセキュリティ上重要な情報を含む可能性があるためログ出力しない
+        logger.debug(`Redirect mode: ${isPopup ? 'popup' : 'standard'}`)
 
         if (isPopup) {
           const popupResponse = `
@@ -566,20 +604,17 @@ router.post('/token', async (req, res) => {
         }
 
         // S256の場合はハッシュ化して比較
-        let calculatedChallenge
+        let calculatedChallenge: string
         if (authCode2.code_challenge_method === 'S256') {
           try {
-            // 注: 本番実装では crypto モジュールが必要
-            // この例ではシンプルにするためハッシュ計算はスタブ化
-            logger.warn('PKCE S256ハッシュ計算は実際の実装が必要です')
-            calculatedChallenge = code_verifier // 実際の実装ではS256ハッシュを計算
+            calculatedChallenge = calculatePKCEChallenge(code_verifier, 'S256')
           } catch (err) {
             logger.error(`PKCE S256 calculation error: ${err instanceof Error ? err.message : err}`)
             return res.status(500).json({ error: 'server_error', error_description: 'Failed to verify code challenge' })
           }
         } else {
           // Plain method
-          calculatedChallenge = code_verifier
+          calculatedChallenge = calculatePKCEChallenge(code_verifier, 'plain')
         }
 
         if (calculatedChallenge !== authCode2.code_challenge) {
@@ -603,9 +638,9 @@ router.post('/token', async (req, res) => {
         })
       }
       // JWTを生成
-      const jwtPayload = {
-        sub: authCode.address, // サブジェクトはSymbolアドレス
-        pub: authCode.publicKey, // 公開鍵
+      const jwtPayload: JWTPayload = {
+        sub: authCode.address!, // サブジェクトはSymbolアドレス
+        pub: authCode.publicKey!, // 公開鍵
         client_id: client_id, // クライアントID
         iat: Math.floor(Date.now() / 1000), // 発行時刻
         jti: uuidv4(), // JWT ID - 一意性を保証
@@ -662,9 +697,9 @@ router.post('/token', async (req, res) => {
         return res.status(400).json({ error: 'Invalid or used/expired refresh_token' })
       }
       // 新しいJWT/リフレッシュトークン発行
-      const jwtPayload = {
-        sub: tokenDoc.address, // サブジェクトはSymbolアドレス
-        pub: tokenDoc.publicKey, // 公開鍵
+      const jwtPayload: JWTPayload = {
+        sub: tokenDoc.address!, // サブジェクトはSymbolアドレス
+        pub: tokenDoc.publicKey!, // 公開鍵
         client_id: client_id, // クライアントID
         iat: Math.floor(Date.now() / 1000), // 発行時刻
         jti: uuidv4(), // JWT ID - 一意性を保証

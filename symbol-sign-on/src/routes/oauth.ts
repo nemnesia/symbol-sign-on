@@ -141,10 +141,7 @@ function calculatePKCEChallenge(verifier: string, method: 'S256' | 'plain'): str
   if (method === 'plain') {
     return verifier
   } else if (method === 'S256') {
-    return crypto
-      .createHash('sha256')
-      .update(verifier)
-      .digest('base64url')
+    return crypto.createHash('sha256').update(verifier).digest('base64url')
   } else {
     throw new Error(`Unsupported PKCE method: ${method}`)
   }
@@ -168,11 +165,10 @@ function isPopupRequest(req: any): boolean {
 
   // リファラーベースの判定
   const referer = headers.referer || headers.referrer
-  if (referer && (
-    referer.includes('oauth_popup') ||
-    referer.includes('popup=true') ||
-    referer.includes('display=popup')
-  )) {
+  if (
+    referer &&
+    (referer.includes('oauth_popup') || referer.includes('popup=true') || referer.includes('display=popup'))
+  ) {
     return true
   }
 
@@ -208,8 +204,7 @@ const router = Router()
 
 router.get('/authorize', async (req, res) => {
   try {
-    const { response_type, client_id, redirect_uri, display, code_challenge, code_challenge_method, state } =
-      req.query
+    const { response_type, client_id, redirect_uri, display, code_challenge, code_challenge_method, state } = req.query
 
     // クエリパラメータの出力は最小限にする（client_id, state, code_challengeなどを含まないように）
     logger.debug(

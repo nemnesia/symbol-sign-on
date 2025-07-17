@@ -10,11 +10,7 @@ import logger from '../utils/logger.js'
  * @param signature - 16進数エンコードされた署名
  * @param publicKey - 公開鍵（16進数）
  */
-export function verifySymbolSignature(
-  challenge: string,
-  signature: string,
-  publicKey: string
-): boolean {
+export function verifySymbolSignature(challenge: string, signature: string, publicKey: string): boolean {
   try {
     // パラメータ検証
     if (!challenge || !signature || !publicKey) {

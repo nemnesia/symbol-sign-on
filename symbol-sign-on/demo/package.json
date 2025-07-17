@@ -1,0 +1,14 @@
+{
+  "name": "symbol-sign-on-demo",
+  "version": "1.0.0",
+  "description": "Demo server for Symbol Sign On",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1"
+  }
+}

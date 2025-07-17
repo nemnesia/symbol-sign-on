@@ -21,11 +21,11 @@
     "prod:status": "./scripts/deploy.sh status",
     "prod:backup": "./scripts/deploy.sh backup",
     "prod:update": "./scripts/deploy.sh update",
+    "demo": "cd demo && node server.mjs",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "prettier --check \"src/**/*.{ts,js,json}\"",
     "format:fix": "prettier --write \"src/**/*.{ts,js,json}\""
-
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -54,7 +54,7 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "volta": {
-    "node": "22.17.0",
+    "node": "24.4.1",
     "npm": "11.4.2",
     "yarn": "4.9.2"
   }

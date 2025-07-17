@@ -5,108 +5,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Symbol Sign On Demo</title>
-  <style>
-    /* 全体のスタイル */
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f8f9fa;
-      color: #333;
-      line-height: 1.6;
-      margin: 0;
-      padding: 20px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    /* コンテナスタイル */
-    .container {
-      background-color: white;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      padding: 30px;
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    /* ヘッダースタイル */
-    h1 {
-      color: #5200c6;
-      /* Symbolブランドカラー */
-      text-align: center;
-      margin-bottom: 30px;
-      font-weight: 600;
-    }
-
-    .logo {
-      max-width: 120px;
-      display: block;
-      margin: 0 auto 20px;
-    }
-
-    /* エラーメッセージスタイル */
-    .error-message {
-      color: #e74c3c;
-      padding: 15px;
-      margin: 15px 0;
-      border-radius: 5px;
-      background-color: rgba(231, 76, 60, 0.1);
-      border-left: 4px solid #e74c3c;
-      display: none;
-      text-align: left;
-      font-size: 14px;
-    }
-
-    /* ボタンコンテナ */
-    .button-container {
-      margin: 25px 0;
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-    }
-
-    /* ボタンスタイル */
-    button {
-      padding: 12px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 5px;
-      background-color: #5200c6;
-      /* Symbolのブランドカラー */
-      color: white;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(82, 0, 198, 0.3);
-    }
-
-    button:hover {
-      background-color: #6e00ff;
-      transform: translateY(-2px);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
-
-    /* スマホ表示用のスタイル */
-    @media (max-width: 768px) {
-      .button-container {
-        flex-direction: column;
-      }
-
-      button {
-        display: block;
-        width: 100%;
-        margin-bottom: 10px;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
   <div class="container">
-    <!-- Symbol ロゴ（オプション：ロゴ画像がある場合） -->
-    <img src="./Symbol_Logo_primary_light_BG.svg" alt="Symbol Logo" class="logo">
-
     <h1>Symbol Sign On Demo</h1>
 
     <div class="button-container">
@@ -816,9 +719,9 @@
         previousAuthMessage.remove();
       }
 
-      // ポップアップを開く
+      const redirectUri = window.location.origin + window.location.pathname;
       const popup = window.open(
-        `/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent('http://localhost:3510/login-demo.html')}&popup=true&display=popup&state=${state}&popup_width=${popupWidth}&popup_height=${popupHeight}`,
+        `http://localhost:3510/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent(redirectUri)}&popup=true&display=popup&state=${state}&popup_width=${popupWidth}&popup_height=${popupHeight}`,
         'SymbolLoginPopup',
         `width=${popupWidth},height=${popupHeight},top=${top},left=${left}`
       );
@@ -887,7 +790,8 @@
 
       // 直接認証画面にリダイレクト（stateとdisplayパラメータを追加）
       // window.location.replace を使用してGETリクエストになるようにする
-      window.location.replace(`/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent('http://localhost:3510/login-demo.html')}&state=${state}&display=redirect`);
+      const redirectUri = window.location.origin + window.location.pathname;
+      window.location.replace(`http://localhost:3510/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&display=redirect`);
     });
   </script>
 </body>

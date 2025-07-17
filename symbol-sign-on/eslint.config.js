@@ -25,4 +25,15 @@ export default [
     },
     rules: {},
   },
+  {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
+    plugins: {},
+    rules: {},
+  },
 ]

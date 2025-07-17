@@ -20,7 +20,12 @@
     "prod:logs": "./scripts/deploy.sh logs",
     "prod:status": "./scripts/deploy.sh status",
     "prod:backup": "./scripts/deploy.sh backup",
-    "prod:update": "./scripts/deploy.sh update"
+    "prod:update": "./scripts/deploy.sh update",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "format": "prettier --check \"src/**/*.{ts,js,json}\"",
+    "format:fix": "prettier --write \"src/**/*.{ts,js,json}\""
+
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -3,11 +3,8 @@
   "type": "module",
   "scripts": {
     "build": "yarn dlx shx rm -rf dist && yarn rollup -c",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui",
+    "test": "yarn dlx vitest run",
+    "test:coverage": "yarn dlx vitest run --coverage",
     "test-server": "node test-page/test-server.js",
     "lint": "yarn dlx eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "yarn dlx eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

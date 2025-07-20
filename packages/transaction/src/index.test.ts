@@ -75,7 +75,13 @@ describe('createSingTx', () => {
 
       // The size should be the total length in bytes
       const sizeBytesHex = result.substring(0, 8)
-      const sizeBytes = parseInt(sizeBytesHex.substring(6, 8) + sizeBytesHex.substring(4, 6) + sizeBytesHex.substring(2, 4) + sizeBytesHex.substring(0, 2), 16)
+      const sizeBytes = parseInt(
+        sizeBytesHex.substring(6, 8) +
+          sizeBytesHex.substring(4, 6) +
+          sizeBytesHex.substring(2, 4) +
+          sizeBytesHex.substring(0, 2),
+        16,
+      )
       const expectedSize = 160 + message.length
 
       expect(sizeBytes).toBe(expectedSize)

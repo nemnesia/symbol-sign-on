@@ -11,8 +11,8 @@ node_modules/
 .pnp.*
 
 # Build output
-dist/
-build/
+dist
+build
 
 # Environment variables
 .env

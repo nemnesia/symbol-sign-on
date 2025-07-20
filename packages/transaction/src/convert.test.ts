@@ -64,7 +64,9 @@ describe('convert functions', () => {
     })
 
     it('should convert bytes to hex and back to bytes correctly', () => {
-      const originalBytes = new Uint8Array([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef])
+      const originalBytes = new Uint8Array([
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+      ])
       const hex = uint8ToHex(originalBytes)
       const resultBytes = hexToUint8(hex)
 

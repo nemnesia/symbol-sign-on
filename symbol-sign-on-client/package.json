@@ -1,5 +1,5 @@
 {
-  "name": "symbol-sign-on",
+  "name": "symbol-sign-on-client",
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -61,10 +61,5 @@
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"
-  },
-  "volta": {
-    "node": "24.4.1",
-    "npm": "11.4.2",
-    "yarn": "4.9.2"
   }
 }

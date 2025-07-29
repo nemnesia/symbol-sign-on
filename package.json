@@ -4,6 +4,7 @@
   "packageManager": "yarn@4.9.2",
   "workspaces": [
     "packages/client",
+    "packages/module",
     "packages/transaction"
   ],
   "dependencies": {

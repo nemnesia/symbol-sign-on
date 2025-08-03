@@ -1,0 +1,59 @@
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Demo App</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
+</head>
+
+<body>
+  <h1>Demo App</h1>
+  <div id="app">
+    <p>Welcome to the Demo App!</p>
+    <script>
+      function getCodeFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+          // コードが取得できた場合の処理
+          console.log('認可コード取得成功:', code);
+
+          // 成功メッセージを表示
+          const successMessage = document.createElement('div');
+          successMessage.id = 'auth-success-message';
+          successMessage.style.color = '#27ae60';
+          successMessage.style.padding = '15px';
+          successMessage.style.margin = '15px 0';
+          successMessage.style.borderRadius = '5px';
+          successMessage.style.backgroundColor = 'rgba(39, 174, 96, 0.1)';
+          successMessage.style.borderLeft = '4px solid #27ae60';
+          successMessage.style.textAlign = 'left';
+          successMessage.textContent = `認証に成功しました！認可コード: ${code}`;
+          successMessage.setAttribute('data-auth-success', 'true'); // 認証成功のマーカー追加
+
+          // 既にポップアップステータスメッセージがあれば削除
+          const existingStatus = document.getElementById('popup-status');
+          if (existingStatus) {
+            existingStatus.remove();
+          }
+
+          document.querySelector('.container').appendChild(successMessage);
+
+          // トークンエンドポイントにリクエストを送信
+          fetchTokenWithCode(code);
+
+          // URL パラメータをクリア（セキュリティ向上のため）
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+
+      // ページロード時に URL パラメータをチェック（リダイレクト認証からの戻り）
+      document.addEventListener('DOMContentLoaded', getCodeFromUrl);
+    </script>
+  </div>
+</body>
+
+</html>

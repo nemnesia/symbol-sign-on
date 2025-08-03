@@ -1,13 +1,14 @@
+import cors from 'cors'
 import dotenv from 'dotenv'
+import express from 'express'
+import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
+import { connectToRedis } from './db/redis.js'
+import healthRoutes from './routes/health.js'
+import oauthRoutes from './routes/oauth.js'
+import logger from './utils/logger.js'
 
 // 最初に環境変数を読み込む
 dotenv.config()
-
-import express from 'express'
-import cors from 'cors'
-import { connectToMongo } from './db/database.js'
-import oauthRoutes from './routes/oauth.js'
-import logger from './utils/logger.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -15,7 +16,18 @@ const PORT = process.env.PORT || 3000
 // ミドルウェア設定
 app.use(
   cors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origin: async (origin, callback) => {
+      try {
+        const allowedOrigins = await getAllowedOriginsFromMongo()
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true)
+        } else {
+          callback(new Error('Not allowed by CORS'))
+        }
+      } catch {
+        callback(new Error('CORS origin check failed'))
+      }
+    },
     credentials: true,
   }),
 )
@@ -31,58 +43,15 @@ app.use((req, res, next) => {
 
 // ルート設定
 app.use('/oauth', oauthRoutes)
+app.use('/health', healthRoutes)
 
 // Chrome DevTools用のエンドポイント（404警告を回避）
 app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
   res.status(404).json({ error: 'Not implemented' })
 })
 
-// ヘルスチェックエンドポイント
-app.get('/health', async (req, res) => {
-  try {
-    // MongoDB接続状態を確認
-    const dbStatus = await checkDatabaseConnection()
-
-    const healthStatus = {
-      status: dbStatus ? 'OK' : 'DEGRADED',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      uptime: process.uptime(),
-      database: dbStatus ? 'connected' : 'disconnected',
-      memory: process.memoryUsage(),
-      environment: process.env.NODE_ENV || 'development',
-    }
-
-    const statusCode = dbStatus ? 200 : 503
-    res.status(statusCode).json(healthStatus)
-  } catch (error) {
-    logger.error(`Health check failed: ${(error as Error).message}`)
-    res.status(503).json({
-      status: 'ERROR',
-      timestamp: new Date().toISOString(),
-      error: 'Health check failed',
-    })
-  }
-})
-
-// データベース接続確認用のヘルパー関数
-async function checkDatabaseConnection(): Promise<boolean> {
-  try {
-    const { getDb } = await import('./db/database.js')
-    const db = getDb()
-    if (!db) return false
-
-    // ping コマンドでDB接続を確認
-    await db.admin().ping()
-    return true
-  } catch {
-    return false
-  }
-}
-
 // 404ハンドラー
 app.use('*', (req, res) => {
-  // Chrome DevToolsや開発者ツール関連のリクエストはログレベルを下げる
   const isDevToolsRequest =
     req.originalUrl.includes('/.well-known/') ||
     req.originalUrl.includes('/favicon.ico') ||
@@ -104,19 +73,14 @@ app.use((err: Error, req: express.Request, res: express.Response) => {
 })
 
 // サーバー起動
-async function startServer() {
+async function startServer(): Promise<void> {
   try {
-    // MongoDB接続
-    try {
-      await connectToMongo()
-      logger.info('Database connected')
-    } catch (dbError) {
-      logger.error(`Database connection failed: ${(dbError as Error).message}`)
-      logger.error('Database connection is required. Exiting...')
-      process.exit(1)
-    }
+    await connectToMongo()
+    logger.info('MongoDB connected')
 
-    // サーバー起動
+    await connectToRedis()
+    logger.info('Redis connected')
+
     app.listen(PORT, () => {
       logger.info(`Server running on http://localhost:${PORT}`)
       logger.info(`API endpoints:`)
@@ -145,28 +109,24 @@ process.on('uncaughtException', (error) => {
 })
 
 // グレースフルシャットダウン
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully')
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`${signal} received, shutting down gracefully`)
   try {
-    const { closeConnection } = await import('./db/database.js')
-    await closeConnection()
+    const { closeConnection: closeMongoConnection } = await import('./db/mongo.js')
+    const { closeConnection: closeRedisConnection } = await import('./db/redis.js')
+    await closeMongoConnection()
+    await closeRedisConnection()
   } catch (error) {
     logger.error(`Error during shutdown: ${(error as Error).message}`)
   }
   process.exit(0)
-})
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully')
-  try {
-    const { closeConnection } = await import('./db/database.js')
-    await closeConnection()
-  } catch (error) {
-    logger.error(`Error during shutdown: ${(error as Error).message}`)
-  }
-  process.exit(0)
-})
-
+/**
+ * アプリケーションの起動
+ */
 startServer().catch((error) => {
   logger.error(`Failed to start application: ${error.message}`)
   process.exit(1)

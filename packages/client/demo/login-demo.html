@@ -250,7 +250,7 @@
           body: JSON.stringify({
             grant_type: 'authorization_code',
             code: code,
-            client_id: 'demo_app'
+            client_id: 'demo-app'
           })
         });
 
@@ -295,15 +295,15 @@
           checkExpiryButton.style.cursor = 'pointer';
           checkExpiryButton.style.transition = 'background-color 0.3s ease';
 
-          checkExpiryButton.addEventListener('mouseover', function() {
+          checkExpiryButton.addEventListener('mouseover', function () {
             this.style.backgroundColor = '#218838';
           });
 
-          checkExpiryButton.addEventListener('mouseout', function() {
+          checkExpiryButton.addEventListener('mouseout', function () {
             this.style.backgroundColor = '#28a745';
           });
 
-          checkExpiryButton.addEventListener('click', function() {
+          checkExpiryButton.addEventListener('click', function () {
             showTokenExpiryStatus();
           });
 
@@ -396,7 +396,7 @@
           body: JSON.stringify({
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
-            client_id: 'demo_app'
+            client_id: 'demo-app'
           })
         });
 
@@ -609,7 +609,7 @@
     }
 
     // リダイレクトパターンの処理
-    document.getElementById('redirect-login').addEventListener('click', function () {
+    document.getElementById('redirect-login').addEventListener('click', async function () {
       // エラーメッセージをクリア
       document.getElementById('error-message').style.display = 'none';
 
@@ -628,13 +628,33 @@
       statusMessage.style.borderRadius = '4px';
       document.querySelector('.container').appendChild(statusMessage);
 
+      // PKCEのためのcode_verifierを生成
+      const codeVerifier = crypto.randomUUID();
+      const encoder = new TextEncoder();
+      const data = encoder.encode(codeVerifier);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const codeChallenge = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log('PKCE code_verifier:', codeVerifier);
+      console.log('PKCE code_challenge (SHA256ハッシュ):', codeChallenge);
+
       // ユニークな状態識別子を生成（リダイレクト後に検証するため）
-      const state = Date.now().toString(36) + Math.random().toString(36).substr(2);
+      const state = crypto.randomUUID();
 
       // 直接認証画面にリダイレクト（stateとdisplayパラメータを追加）
       // window.location.href を使用してブラウザの履歴に残るようにする（戻るボタンが使える）
-      const redirectUri = window.location.origin + window.location.pathname;
-      window.location.href = `http://localhost:3510/login.html?client_id=demo_app&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&display=redirect`;
+      const redirectUri = window.location.origin + window.location.pathname + 'demo-app.html';
+
+      const urlParams = new URLSearchParams({
+        client_id: 'demo-app',
+        redirect_uri: redirectUri,
+        state: state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+      });
+      console.log('リダイレクトURL:', `http://localhost:3510/login.html?${urlParams.toString()}`);
+
+      window.location.href = `http://localhost:3510/login.html?${urlParams.toString()}`;
     });
   </script>
 </body>

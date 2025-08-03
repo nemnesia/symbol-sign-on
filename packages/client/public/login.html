@@ -139,6 +139,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const clientId = urlParams.get('client_id');
     const redirectUri = urlParams.get('redirect_uri');
+    const state = urlParams.get('state');
+    const codeChallenge = urlParams.get('code_challenge');
+    const codeChallengeMethod = urlParams.get('code_challenge_method');
 
     // URLから認可コードを確認（リダイレクトで戻ってきた場合）
     const code = urlParams.get('code');
@@ -203,7 +206,16 @@
 
     // /oauth/authorize からチャレンジ取得
     if (clientId && redirectUri) {
-      fetch(`/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`)
+      const urlParams = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        state: state,
+        code_challenge: codeChallenge,
+        code_challenge_method: codeChallengeMethod,
+      });
+
+      fetch(`/oauth/authorize?${urlParams.toString()}`)
         .then(response => response.json())
         .then(data => {
           if (data.error) {

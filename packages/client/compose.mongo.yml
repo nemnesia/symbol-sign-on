@@ -1,7 +1,7 @@
 services:
   mongodb:
     image: mongo:7.0
-    container_name: symbol-sign-on-mongodb
+    container_name: mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -13,12 +13,12 @@ services:
       - ./mongodb_data:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
     networks:
-      - symbol-sign-on-network
+      - mongo-network
 
   # MongoDB管理用のMongo Express（オプション）
   mongo-express:
     image: mongo-express:1.0.0
-    container_name: symbol-sign-on-mongo-express
+    container_name: mongo-express
     restart: unless-stopped
     ports:
       - "8081:8081"
@@ -32,12 +32,12 @@ services:
     depends_on:
       - mongodb
     networks:
-      - symbol-sign-on-network
+      - mongo-network
 
 volumes:
   mongodb_data:
     driver: local
 
 networks:
-  symbol-sign-on-network:
+  mongo-network:
     driver: bridge

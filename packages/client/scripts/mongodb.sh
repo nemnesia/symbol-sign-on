@@ -4,7 +4,7 @@
 
 set -e
 
-COMPOSE_FILE="docker-compose.dev.yml"
+COMPOSE_FILE="compose.mongo.yml"
 
 case "$1" in
     "start")

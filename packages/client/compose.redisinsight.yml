@@ -1,0 +1,18 @@
+services:
+  redis-insight:
+    container_name: redis-insight
+    image: redislabs/redisinsight:latest
+    ports:
+      - '8001:5540'
+    volumes:
+      - redis-insight-data:/db
+    networks:
+      - redis-network
+
+volumes:
+  redis-insight-data:
+    driver: local
+
+networks:
+  redis-network:
+    external: true

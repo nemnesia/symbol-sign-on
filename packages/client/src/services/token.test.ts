@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response } from 'express'
-import { handleToken } from './token.js'
-import { getAuthCode, getRefreshToken, setAuthCode, setRefreshToken, deleteRefreshToken } from '../db/redis.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/redis.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
+import { handleToken } from './token.js'
 
 vi.mock('../db/redis.js')
 vi.mock('../utils/jwt.js')
@@ -49,14 +49,14 @@ describe('handleToken', () => {
   let mockJson: ReturnType<typeof vi.fn>
   let mockStatus: ReturnType<typeof vi.fn>
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  vi.mocked(generateJWT).mockReturnValue(mockJWT)
-  mockJson = vi.fn()
-  mockStatus = vi.fn(() => ({ json: mockJson }))
-  mockReq = { body: {} }
-  mockRes = { json: mockJson, status: mockStatus }
-})
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(generateJWT).mockReturnValue(mockJWT)
+    mockJson = vi.fn()
+    mockStatus = vi.fn(() => ({ json: mockJson }))
+    mockReq = { body: {} }
+    mockRes = { json: mockJson, status: mockStatus }
+  })
 
   it('grant_type未指定は400エラー', async () => {
     await handleToken(mockReq as Request, mockRes as Response)
@@ -125,7 +125,12 @@ beforeEach(() => {
   })
 
   it('authorization_code: PKCE method不正は400エラー', async () => {
-    mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client', code_verifier: 'verifier' }
+    mockReq.body = {
+      grant_type: 'authorization_code',
+      code: 'valid-code',
+      client_id: 'client',
+      code_verifier: 'verifier',
+    }
     vi.mocked(getAuthCode).mockResolvedValue({ ...mockAuthCodeDoc, pkce_challenge_method: 'plain' })
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
@@ -152,7 +157,12 @@ beforeEach(() => {
   })
 
   it('authorization_code: DB取得エラーは500エラー', async () => {
-    mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client', code_verifier: 'verifier' }
+    mockReq.body = {
+      grant_type: 'authorization_code',
+      code: 'valid-code',
+      client_id: 'client',
+      code_verifier: 'verifier',
+    }
     vi.mocked(getAuthCode).mockRejectedValue(new Error('DB error'))
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(500)

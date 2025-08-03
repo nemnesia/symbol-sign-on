@@ -1,6 +1,6 @@
 import express from 'express'
 import request from 'supertest'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import healthRouter from './health.js'
 
 const app = express()
@@ -61,9 +61,11 @@ describe('Health Check Route', () => {
     vi.doMock('../db/mongo.js', () => ({
       getDb: () => ({
         admin: () => ({
-          ping: () => { throw new Error('mongo ping error') }
-        })
-      })
+          ping: () => {
+            throw new Error('mongo ping error')
+          },
+        }),
+      }),
     }))
     vi.resetModules()
     const { default: errorHealthRouter } = await import('./health.js')
@@ -78,8 +80,10 @@ describe('Health Check Route', () => {
   it('GET /health should respond 503 if redis ping throws', async () => {
     vi.doMock('../db/redis.js', () => ({
       getRedisClient: () => ({
-        ping: async () => { throw new Error('redis ping error') }
-      })
+        ping: async () => {
+          throw new Error('redis ping error')
+        },
+      }),
     }))
     vi.resetModules()
     const { default: errorHealthRouter } = await import('./health.js')
@@ -95,8 +99,8 @@ describe('Health Check Route', () => {
     // Redis pingがタイムアウトするようにsetTimeoutだけを使うモック
     vi.doMock('../db/redis.js', () => ({
       getRedisClient: () => ({
-        ping: async () => new Promise((resolve) => setTimeout(() => resolve('PONG'), 5000)) // 5秒でPONG
-      })
+        ping: async () => new Promise((resolve) => setTimeout(() => resolve('PONG'), 5000)), // 5秒でPONG
+      }),
     }))
     vi.resetModules()
     const { default: errorHealthRouter } = await import('./health.js')

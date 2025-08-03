@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import jwt from 'jsonwebtoken'
-import { generateJWT, verifyAndRevokeJWT } from './jwt.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as redis from '../db/redis.js'
 import logger from '../utils/logger.js'
+import { generateJWT, verifyAndRevokeJWT } from './jwt.js'
 
 vi.mock('../db/redis.js')
 vi.mock('../utils/logger.js', () => ({
@@ -53,7 +53,7 @@ describe('JWTユーティリティ', () => {
     expect(result).toBeNull()
     expect(setAccessTokenBlacklist).toHaveBeenCalledWith(
       invalidToken,
-      expect.objectContaining({ jwt_id: invalidToken })
+      expect.objectContaining({ jwt_id: invalidToken }),
     )
     expect(logger.error).toHaveBeenCalledWith('JWT verification error: Token invalid or expired')
     expect(logger.info).toHaveBeenCalledWith(`JWT ${invalidToken} added to blacklist`)

@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response } from 'express'
-import { handleVerifySignature } from './verify-signature.js'
-import { getChallenge, deleteChallenge, setAuthCode } from '../db/redis.js'
-import logger from '../utils/logger.js'
 import { utils } from 'symbol-sdk'
 import { SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { deleteChallenge, getChallenge, setAuthCode } from '../db/redis.js'
+import logger from '../utils/logger.js'
+import { handleVerifySignature } from './verify-signature.js'
 
 // 型定義 - ChallengeDocumentがない場合の暫定的な定義
 interface ChallengeDocument {
@@ -32,7 +32,7 @@ vi.mock('symbol-sdk', () => ({
   utils: {
     hexToUint8: vi.fn(),
     uint8ToHex: vi.fn(),
-  }
+  },
 }))
 
 vi.mock('symbol-sdk/symbol', () => ({
@@ -110,7 +110,11 @@ describe('handleVerifySignature', () => {
       pkce_challenge_method: 'S256',
     })
     const jsonBytes = new TextEncoder().encode(jsonString)
-    const hexString = '00' + Array.from(jsonBytes).map(b => b.toString(16).padStart(2, '0')).join('')
+    const hexString =
+      '00' +
+      Array.from(jsonBytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
 
     // hexToUint8は実際のJSONバイト配列を返すようにモック
     vi.mocked(utils.hexToUint8).mockImplementation((hex: string) => {
@@ -163,7 +167,7 @@ describe('handleVerifySignature', () => {
           pkce_challenge_method: 'S256',
           used: false,
         },
-        120
+        120,
       )
       expect(deleteChallenge).toHaveBeenCalledWith('test-challenge')
     })
@@ -214,7 +218,7 @@ describe('handleVerifySignature', () => {
 
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
-        error: 'Failed to verify signature: Invalid transaction signature'
+        error: 'Failed to verify signature: Invalid transaction signature',
       })
       expect(logger.error).toHaveBeenCalledWith('Failed to verify signature: Invalid transaction signature')
     })
@@ -230,7 +234,7 @@ describe('handleVerifySignature', () => {
 
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
-        error: 'Failed to verify signature: Unsupported transaction type'
+        error: 'Failed to verify signature: Unsupported transaction type',
       })
     })
 
@@ -245,12 +249,16 @@ describe('handleVerifySignature', () => {
 
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
-        error: 'Failed to verify signature: Message is empty.'
+        error: 'Failed to verify signature: Message is empty.',
       })
     })
 
     it('メッセージのJSONが無効な場合は400エラーを返す', async () => {
-      const invalidHex = '00' + Array.from(new TextEncoder().encode('invalid-json')).map(b => b.toString(16).padStart(2, '0')).join('')
+      const invalidHex =
+        '00' +
+        Array.from(new TextEncoder().encode('invalid-json'))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(invalidHex)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -258,8 +266,8 @@ describe('handleVerifySignature', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: expect.stringContaining('Failed to verify signature: Invalid JSON format in transaction message')
-        })
+          error: expect.stringContaining('Failed to verify signature: Invalid JSON format in transaction message'),
+        }),
       )
     })
 
@@ -268,14 +276,18 @@ describe('handleVerifySignature', () => {
         state: 'test-state',
         // code_challengeを省略
       })
-      const hexString = '00' + Array.from(new TextEncoder().encode(jsonString)).map(b => b.toString(16).padStart(2, '0')).join('')
+      const hexString =
+        '00' +
+        Array.from(new TextEncoder().encode(jsonString))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
-        error: 'Failed to verify signature: Missing code_challenge in transaction message'
+        error: 'Failed to verify signature: Missing code_challenge in transaction message',
       })
     })
 
@@ -343,9 +355,7 @@ describe('handleVerifySignature', () => {
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Invalid redirect_uri:')
-      )
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Invalid redirect_uri:'))
       expect(mockJson).toHaveBeenCalledWith({
         code: 'test-auth-code-uuid',
         expires_in: 120,
@@ -370,7 +380,11 @@ describe('handleVerifySignature', () => {
         code_challenge: 'test-challenge',
         state: 'test-state',
       })
-      const hexString = '00' + Array.from(new TextEncoder().encode(jsonString)).map(b => b.toString(16).padStart(2, '0')).join('')
+      const hexString =
+        '00' +
+        Array.from(new TextEncoder().encode(jsonString))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
 
       vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
@@ -412,7 +426,11 @@ describe('handleVerifySignature', () => {
         code_challenge: 'test-challenge',
         // stateを省略
       })
-      const hexString = '00' + Array.from(new TextEncoder().encode(jsonString)).map(b => b.toString(16).padStart(2, '0')).join('')
+      const hexString =
+        '00' +
+        Array.from(new TextEncoder().encode(jsonString))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
       vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(setAuthCode).mockResolvedValue(undefined)
@@ -431,7 +449,11 @@ describe('handleVerifySignature', () => {
         state: 'test-state',
         // pkce関連を省略
       })
-      const hexString = '00' + Array.from(new TextEncoder().encode(jsonString)).map(b => b.toString(16).padStart(2, '0')).join('')
+      const hexString =
+        '00' +
+        Array.from(new TextEncoder().encode(jsonString))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
       vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(setAuthCode).mockResolvedValue(undefined)
@@ -444,7 +466,7 @@ describe('handleVerifySignature', () => {
           pkce_challenge: undefined,
           pkce_challenge_method: undefined,
         }),
-        120
+        120,
       )
     })
   })

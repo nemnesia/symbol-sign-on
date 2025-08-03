@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response } from 'express'
-import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
-import { setChallenge } from '../db/redis.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Clients } from '../db/mongo.js'
+import { setChallenge } from '../db/redis.js'
 import logger from '../utils/logger.js'
+import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
 
 // モック設定
 vi.mock('../db/redis.js')
@@ -282,9 +282,7 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('error=Database connection failed'),
-      )
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Database connection failed'))
     })
   })
 
@@ -339,9 +337,7 @@ describe('handleAuthorize', () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('/oauth/authorize Redis error while inserting challenge'),
       )
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error: Redis connection failed'),
-      )
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error: Redis connection failed'))
     })
 
     it('Redisエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
@@ -353,9 +349,7 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('error=Redis connection failed'),
-      )
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Redis connection failed'))
     })
 
     it('チャレンジの有効期限が正しく設定される（定数使用）', async () => {
@@ -423,9 +417,7 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize error: Unexpected error'),
-      )
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('/oauth/authorize error: Unexpected error'))
     })
   })
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response } from 'express'
-import { handleUserinfo } from './userinfo.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { verifyAndRevokeJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
+import { handleUserinfo } from './userinfo.js'
 
 vi.mock('../utils/jwt.js')
 vi.mock('../utils/logger.js', () => ({

@@ -8,10 +8,10 @@
  */
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { setChallenge } from '../db/redis.js'
 import { Clients } from '../db/mongo.js'
-import logger from '../utils/logger.js'
+import { setChallenge } from '../db/redis.js'
 import { ChallengeDocument } from '../types/redis.types.js'
+import logger from '../utils/logger.js'
 
 // 定数定義
 const CHALLENGE_EXPIRES_IN = 300 // 5分
@@ -216,12 +216,15 @@ function isValidRedirectUri(uri: string): boolean {
  * @param redirectUri リダイレクトURI
  * @returns 検証結果
  */
-async function validateClient(clientId: string, redirectUri: string): Promise<{
-  valid: boolean;
-  statusCode?: number;
-  errorCode?: string;
-  message?: string;
-  logMessage?: string;
+async function validateClient(
+  clientId: string,
+  redirectUri: string,
+): Promise<{
+  valid: boolean
+  statusCode?: number
+  errorCode?: string
+  message?: string
+  logMessage?: string
 }> {
   try {
     // クライアント情報をMongoDBから取得

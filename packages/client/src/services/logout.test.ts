@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { Request, Response } from 'express'
-import { handleLogout } from './logout.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getRefreshToken, setRefreshToken } from '../db/redis.js'
 import logger from '../utils/logger.js'
+import { handleLogout } from './logout.js'
 
 vi.mock('../db/redis.js')
 vi.mock('../utils/logger.js', () => ({

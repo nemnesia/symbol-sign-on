@@ -22,9 +22,11 @@ app.use(
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true)
         } else {
+          logger.error(`CORS blocked request from origin: ${origin}`)
           callback(new Error('Not allowed by CORS'))
         }
-      } catch {
+      } catch (error) {
+        logger.error(`CORS error: ${(error as Error).message}`)
         callback(new Error('CORS origin check failed'))
       }
     },

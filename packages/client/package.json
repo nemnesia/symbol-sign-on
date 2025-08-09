@@ -44,6 +44,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.18.0",
     "sss-module": "^1.0.4",
+    "symbol-sdk": "^3.2.3",
     "uuid": "^11.1.0",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0"

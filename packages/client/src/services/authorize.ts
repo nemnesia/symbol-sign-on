@@ -230,25 +230,25 @@ async function validateClient(
     // クライアント情報をMongoDBから取得
     const client = await Clients.findOne({ client_id: clientId })
 
-    // クライアントが存在しない、またはtrusted_redirect_urisが未登録の場合はエラー
-    if (!client || !client.trusted_redirect_uris) {
+    // クライアントが存在しない、またはtrusted_redirect_uriが未登録の場合はエラー
+    if (!client || !client.trusted_redirect_uri) {
       return {
         valid: false,
         statusCode: 400,
         errorCode: 'unauthorized_client',
-        message: 'Client ID is not registered or has no trusted URIs',
-        logMessage: `/oauth/authorize client not found or has no trusted URIs: client_id=${clientId}`,
+        message: 'Client ID is not registered or has no trusted URI',
+        logMessage: `/oauth/authorize client not found or has no trusted URI: client_id=${clientId}`,
       }
     }
 
     // redirect_uriが登録済みURIと完全一致するか検証（セキュリティ強化）
-    if (!client.trusted_redirect_uris.includes(redirectUri)) {
+    if (!client.trusted_redirect_uri.includes(redirectUri)) {
       return {
         valid: false,
         statusCode: 400,
         errorCode: 'invalid_request',
-        message: 'redirect_uri does not match any trusted URIs',
-        logMessage: `/oauth/authorize redirect_uri does not match any trusted URIs: ${redirectUri}`,
+        message: 'redirect_uri does not match any trusted URI',
+        logMessage: `/oauth/authorize redirect_uri does not match any trusted URI: ${redirectUri}`,
       }
     }
 

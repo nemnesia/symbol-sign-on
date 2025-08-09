@@ -4,6 +4,6 @@
  */
 export interface ClientDocument {
   client_id: string
-  trusted_redirect_uris: string[]
+  trusted_redirect_uri: string
   createdAt: Date
 }

@@ -8,8 +8,7 @@
     "packages/transaction"
   ],
   "dependencies": {
-    "express": "^4.21.1",
-    "symbol-sdk": "^3.2.3"
+    "express": "^4.21.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",

@@ -58,16 +58,21 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
   const clients = await Clients.find({}).toArray()
   // trusted_redirect_urisからオリジン部分だけ抽出し、重複除去
   const origins = clients
-    .flatMap((c) =>
-      c.trusted_redirect_uris.map((url) => {
+    .flatMap((c) => {
+      const uris = typeof c.trusted_redirect_uri === 'string'
+        ? [c.trusted_redirect_uri]
+        : Array.isArray(c.trusted_redirect_uri)
+          ? c.trusted_redirect_uri
+          : [];
+      return uris.map((url) => {
         try {
           const u = new URL(url)
           return u.origin
         } catch {
           return null
         }
-      }),
-    )
+      });
+    })
     .filter((o): o is string => !!o)
   // 重複除去
   return Array.from(new Set(origins))

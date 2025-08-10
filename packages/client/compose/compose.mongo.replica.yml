@@ -1,0 +1,39 @@
+services:
+  mongo1:
+    image: mongo:8.0
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo1_data:/data/db
+    networks:
+      - mongo_net
+
+  mongo2:
+    image: mongo:8.0
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - 27018:27017
+    volumes:
+      - mongo2_data:/data/db
+    networks:
+      - mongo_net
+
+  mongo3:
+    image: mongo:8.0
+    command: mongod --replSet rs0 --bind_ip_all
+    ports:
+      - 27019:27017
+    volumes:
+      - mongo3_data:/data/db
+    networks:
+      - mongo_net
+
+volumes:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
+
+networks:
+  mongo_net:
+    driver: bridge

@@ -113,50 +113,164 @@
     <img src="./Symbol_Logo_primary_light_BG.svg" alt="Symbol Logo" class="logo">
 
     <h1>Symbol Sign On</h1>
+
     <div id="auth-details">
-      <p>Client ID: <span id="client-id"></span></p>
+      <p id="client-id">&nbsp;</p>
     </div>
 
     <div id="error-message" class="error-message"></div>
     <div id="success-message" class="success-message"></div>
 
     <div id="auth-controls">
-      <button id="symbol-auth-btn" class="auth-button">Symbolで認証</button>
-      <div id="status" class="status"></div>
+      <button id="symbol-auth-btn" class="auth-button">Symbol Sign</button>
+      <div id="status" class="status">&nbsp;</div>
     </div>
   </div>
 
   <script type="module">
-    import { createSignTx } from './symbol-sign-tx.mjs';
+    import { getChallenge, createSignTx, isMobileDevice, verifySignature } from './symbol-sign-on.mjs';
+
+    // エラーを表示する関数
+    function showError(message) {
+      const errorElement = document.getElementById('error-message');
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+
+    // 成功メッセージを表示する関数
+    function showSuccess(message) {
+      const successElement = document.getElementById('success-message');
+      successElement.textContent = message;
+      successElement.style.display = 'block';
+      // エラーメッセージがあれば非表示にする
+      document.getElementById('error-message').style.display = 'none';
+    }
+
+    // ステータスメッセージを表示する関数
+    function showStatus(message) {
+      document.getElementById('status').textContent = message;
+    }
+
+    // POSTのデータを取得して表示する関数
+    function getPostData() {
+      // サーバーから埋め込まれたPOSTデータを取得
+      if (window.postData) {
+        console.debug('POSTデータ受信:', window.postData);
+        return window.postData;
+      }
+      console.debug('POSTデータがありません');
+      return null;
+    }
+
+    // URLパラメータからクエリを取得する関数
+    function getQueryParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const params = {};
+      for (const [key, value] of urlParams.entries()) {
+        params[key] = value;
+      }
+      console.debug('クエリーパラメータ:', params);
+      return params;
+    }
 
     async function authenticateWithSymbol() {
-      const sso = new SymbolSignOn();
+      // チャレンジ
+      let challenge = undefined;
+      try {
+        const result = await getChallenge({
+          client_id: receivedData.client_id,
+          redirect_uri: receivedData.redirect_uri,
+        }, window.origin);
+        if (result.error) {
+          showError(result.error);
+        }
+        if (!result.challenge) {
+          showError('Failed to obtain challenge code');
+        }
+        challenge = result.challenge;
 
-      // 1. チャレンジを取得
-      const challengeResponse = await sso.getChallenge({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        state: state,
-        code_challenge: codeChallenge,
-        code_challenge_method: codeChallengeMethod,
-      })
-      console.log('challenge:', challengeResponse.challenge);
+        console.debug('チャレンジ結果:', result);
 
-      sso.createTransaction("BE0B4CF546B7B4F4BBFCFF9F574FDA527C07A53D3FC76F8BB7DB746F8E8E0A9F")
+      } catch (error) {
+        console.error('Unexpected error: Failed to obtain challenge code:', error);
+        showError("Unexpected error: Failed to obtain challenge code");
+      }
 
-      // PC/Mobileデバイスの判定
-      if (sso.isMobileDevice()) {
-        // Mobile
-      } else {
-        // PC
+      // トランザクション作成
+      let transactionHex = undefined;
+      try {
+        const messageJson = {
+          challenge,
+          state: receivedData.state,
+          pkce_challenge: receivedData.code_challenge,
+          pkce_challenge_method: receivedData.code_challenge_method
+        };
+        const message = '\0' + JSON.stringify(messageJson);
+        transactionHex = createSignTx('testnet', message);
+
+        console.debug('トランザクションのHex:', transactionHex);
+
+      } catch (error) {
+        console.error('Unexpected error: Failed to create transaction:', error);
+        showError("Unexpected error: Failed to create transaction");
+      }
+
+      // 署名
+      let signedTx = undefined;
+      try {
+        if (isMobileDevice()) {
+          console.debug(('モバイルデバイスでの処理を実行'));
+        } else {
+          console.debug(('デスクトップデバイスでの処理を実行'));
+          if (SSSModule.requestSSS()) {
+            SSSModule.setTransactionByPayload(transactionHex);
+            signedTx = await SSSModule.requestSign()
+            console.debug('署名されたトランザクション:', signedTx.payload);
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected error: Failed to sign:', error);
+        showError("Unexpected error: Failed to sign");
+      }
+
+      // 送信
+      try {
+        verifySignature(signedTx.payload, window.origin);
+      } catch (error) {
+        console.error('Unexpected error: Failed to send:', error);
+        showError("Unexpected error: Failed to send");
       }
     }
 
+    // /////////////////////////////////
+
     // Symbolで認証ボタンのクリックイベント
     document.getElementById('symbol-auth-btn').addEventListener('click', function () {
-      console.log('Symbol認証ボタンがクリックされました');
+      console.debug('Symbol認証ボタンがクリックされました');
       authenticateWithSymbol();
     });
+
+    // /////////////////////////////////
+
+    // 初期化
+    document.getElementById('error-message').style.display = 'none';
+    document.getElementById('success-message').style.display = 'none';
+
+    // POSTデータを取得
+    let receivedData = getPostData();
+    showStatus('POST mode');
+    if (!receivedData) {
+      // URLパラメータを取得
+      receivedData = getQueryParams();
+      showStatus('GET mode');
+    }
+    document.getElementById('client-id').textContent = receivedData.client_id || 'Unknown';
+
+
+
+
+
+
 
     // end of script
   </script>

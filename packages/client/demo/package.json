@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Demo server for Symbol Sign On",
   "type": "commonjs",
-  "main": "server.js",
+  "main": "server.mjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
   },
   "dependencies": {
     "express": "^4.21.1"

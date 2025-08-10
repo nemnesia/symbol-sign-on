@@ -8,8 +8,7 @@
  */
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { Clients } from '../db/mongo.js'
-import { setChallenge } from '../db/mongo.js'
+import { Clients, setChallenge } from '../db/mongo.js'
 import { ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
@@ -20,6 +19,11 @@ const SUPPORTED_RESPONSE_TYPES = ['code'] as const
 /**
  * /oauth/authorize の処理
  * チャレンジコードリクエストの処理
+ *
+ * リクエスト
+ * - response_type: 'code'（固定）
+ * - client_id: クライアントID
+ * - redirect_uri: リダイレクトURI
  * @param req Expressリクエスト
  * @param res Expressレスポンス
  */

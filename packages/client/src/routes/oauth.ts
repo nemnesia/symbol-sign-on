@@ -23,7 +23,7 @@ router.get('/authorize', handleAuthorize)
 /**
  * 署名検証エンドポイント
  */
-router.put('/verify-signature', handleVerifySignature)
+router.post('/verify-signature', handleVerifySignature)
 
 /**
  * トークンエンドポイント

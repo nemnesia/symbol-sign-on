@@ -6,11 +6,11 @@ import logger from '../utils/logger.js'
 import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
 
 // モック設定
-vi.mock('../db/mongo.js')
 vi.mock('../db/mongo.js', () => ({
   Clients: {
     findOne: vi.fn(),
   },
+  setChallenge: vi.fn(),
 }))
 vi.mock('../utils/logger.js', () => ({
   default: {
@@ -209,17 +209,17 @@ describe('handleAuthorize', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
         error: 'unauthorized_client',
-        error_description: 'Client ID is not registered or has no trusted URIs',
+        error_description: 'Client ID is not registered or has no trusted URI',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize client not found or has no trusted URIs: client_id=test-client'),
+        expect.stringContaining('/oauth/authorize client not found or has no trusted URI: client_id=test-client'),
       )
     })
 
     it('クライアントのtrusted_redirect_urisが未設定の場合はエラーを返す', async () => {
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: 'test-client',
-        trusted_redirect_uris: undefined,
+        trusted_redirect_uri: undefined,
       } as any)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
@@ -227,17 +227,17 @@ describe('handleAuthorize', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
         error: 'unauthorized_client',
-        error_description: 'Client ID is not registered or has no trusted URIs',
+        error_description: 'Client ID is not registered or has no trusted URI',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize client not found or has no trusted URIs: client_id=test-client'),
+        expect.stringContaining('/oauth/authorize client not found or has no trusted URI: client_id=test-client'),
       )
     })
 
     it('redirect_uriが登録されていない場合はエラーを返す', async () => {
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: 'test-client',
-        trusted_redirect_uris: ['http://localhost:4000/callback'],
+        trusted_redirect_uri: ['http://localhost:4000/callback'],
       } as any)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
@@ -245,11 +245,11 @@ describe('handleAuthorize', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({
         error: 'invalid_request',
-        error_description: 'redirect_uri does not match any trusted URIs',
+        error_description: 'redirect_uri does not match any trusted URI',
       })
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining(
-          '/oauth/authorize redirect_uri does not match any trusted URIs: http://localhost:3000/callback',
+          '/oauth/authorize redirect_uri does not match any trusted URI: http://localhost:3000/callback',
         ),
       )
     })
@@ -296,7 +296,7 @@ describe('handleAuthorize', () => {
 
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: 'test-client',
-        trusted_redirect_uris: ['http://localhost:3000/callback'],
+        trusted_redirect_uri: ['http://localhost:3000/callback'],
       } as any)
     })
 
@@ -332,10 +332,10 @@ describe('handleAuthorize', () => {
       expect(mockStatus).toHaveBeenCalledWith(500)
       expect(mockJson).toHaveBeenCalledWith({
         error: 'server_error',
-        error_description: 'Redis error',
+        error_description: 'Database error',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize Redis error while inserting challenge'),
+        expect.stringContaining('/oauth/authorize Database error while inserting challenge'),
       )
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error: Redis connection failed'))
     })
@@ -431,7 +431,7 @@ describe('handleAuthorize', () => {
 
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: 'valid-client',
-        trusted_redirect_uris: ['https://example.com/callback'],
+        trusted_redirect_uri: ['https://example.com/callback'],
       } as any)
 
       vi.mocked(setChallenge).mockResolvedValue(undefined)
@@ -457,7 +457,7 @@ describe('handleAuthorize', () => {
 
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: '123',
-        trusted_redirect_uris: ['http://localhost:3000/callback'],
+        trusted_redirect_uri: ['http://localhost:3000/callback'],
       } as any)
 
       vi.mocked(setChallenge).mockResolvedValue(undefined)
@@ -483,7 +483,7 @@ describe('handleAuthorize', () => {
 
       vi.mocked(Clients.findOne).mockResolvedValue({
         client_id: 'test-client',
-        trusted_redirect_uris: ['custom://app/callback'],
+        trusted_redirect_uri: ['custom://app/callback'],
       } as any)
 
       vi.mocked(setChallenge).mockResolvedValue(undefined)

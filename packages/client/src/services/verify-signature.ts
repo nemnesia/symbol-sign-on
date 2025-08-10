@@ -29,28 +29,10 @@ const SYMBOL_NETWORK_TYPE = process.env.SYMBOL_NETWORK_TYPE || 'testnet'
 interface SignatureParams {
   publicKey: string
   address: string
-  code_challenge: string
+  challenge: string
   state?: string
   pkce_challenge?: string
   pkce_challenge_method?: string
-}
-
-/**
- * HTMLエスケープ関数（XSS対策）
- * @param unsafe エスケープが必要な文字列
- * @returns エスケープされた安全な文字列
- */
-function escapeHtml(unsafe: string): string {
-  return unsafe.replace(/[&<>"']/g, (match) => {
-    const escape: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    }
-    return escape[match]
-  })
 }
 
 /**
@@ -60,6 +42,36 @@ function escapeHtml(unsafe: string): string {
  * @param res Expressレスポンス
  */
 export async function handleVerifySignature(req: Request, res: Response): Promise<void> {
+  // プリフライトリクエスト（OPTIONS）の処理
+  if (req.method === 'OPTIONS') {
+    // チャレンジからredirect_uriを取得してCORS設定
+    try {
+      const { payload } = req.body
+      if (payload) {
+        const signatureParams = verifySignature(payload)
+        const challengeDoc = await getChallenge(signatureParams.challenge)
+        if (challengeDoc?.redirect_uri) {
+          const redirectUrl = new URL(challengeDoc.redirect_uri)
+          const allowedOrigin = `${redirectUrl.protocol}//${redirectUrl.host}`
+
+          const requestOrigin = req.headers.origin
+          if (requestOrigin === allowedOrigin) {
+            res.setHeader('Access-Control-Allow-Origin', requestOrigin)
+            res.setHeader('Access-Control-Allow-Credentials', 'true')
+          }
+        }
+      }
+    } catch {
+      // エラーの場合はデフォルトのCORS設定
+      logger.debug('CORS preflight: using default settings due to error')
+    }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+    res.status(204).end()
+    return
+  }
+
   try {
     const { payload } = req.body
 
@@ -82,7 +94,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     // チャレンジ有効性チェック
     let challengeDoc: ChallengeDocument | null
     try {
-      challengeDoc = await getChallenge(signatureParams.code_challenge)
+      challengeDoc = await getChallenge(signatureParams.challenge)
     } catch (redisError) {
       logger.error(`Redis query failed: ${(redisError as Error).message}`)
       res.status(500).json({ error: 'Redis connection error' })
@@ -92,6 +104,22 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     if (!challengeDoc) {
       res.status(400).json({ error: 'Invalid or expired challenge' })
       return
+    }
+
+    // リダイレクトURLからオリジンを取得してCORS設定
+    if (challengeDoc.redirect_uri) {
+      try {
+        const redirectUrl = new URL(challengeDoc.redirect_uri)
+        const allowedOrigin = `${redirectUrl.protocol}//${redirectUrl.host}`
+
+        const requestOrigin = req.headers.origin
+        if (requestOrigin === allowedOrigin) {
+          res.setHeader('Access-Control-Allow-Origin', requestOrigin)
+          res.setHeader('Access-Control-Allow-Credentials', 'true')
+        }
+      } catch (corsError) {
+        logger.debug(`CORS setup failed: ${(corsError as Error).message}`)
+      }
     }
 
     // 認可コード発行
@@ -115,7 +143,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
 
     // チャレンジを削除
     try {
-      await deleteChallenge(signatureParams.code_challenge)
+      await deleteChallenge(signatureParams.challenge)
     } catch (dbError) {
       logger.error(`Failed to delete challenge from database: ${(dbError as Error).message}`)
       // チャレンジ削除失敗は致命的ではないので続行
@@ -134,21 +162,10 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
         }
 
         // ポップアップ対応は廃止。通常リダイレクトのみ。
-        const safeRedirectUrl = escapeHtml(redirectUrl.toString())
-        res.send(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Redirecting...</title>
-  <meta http-equiv="refresh" content="0;url=${safeRedirectUrl}">
-</head>
-<body>
-  <p>リダイレクトしています...</p>
-  <script>
-    window.location.replace('${safeRedirectUrl}');
-  </script>
-</body>
-</html>`)
+        const safeRedirectUrl = redirectUrl.toString()
+
+        // HTTPリダイレクト（302）でサーバー側リダイレクトを実行
+        res.redirect(302, safeRedirectUrl)
         return
       } catch (redirectError) {
         logger.error(`Invalid redirect_uri: ${(redirectError as Error).message}`)
@@ -189,11 +206,11 @@ function verifySignature(payload: string): SignatureParams {
   const publicKey = tx.signerPublicKey.toString()
   const address = facade.createPublicAccount(tx.signerPublicKey).address.toString()
 
-  let code_challenge = ''
+  let challenge = ''
   let state: string | undefined = undefined
   let pkce_challenge: string | undefined = undefined
   let pkce_challenge_method: string | undefined = undefined
-  if (tx.type.value === models.TransactionType.TRANSFER) {
+  if (tx.type.value === models.TransactionType.TRANSFER.value) {
     const transferTx = tx as models.TransferTransactionV1
     if (transferTx.message && transferTx.message.length > 0) {
       const messageHex = utils.uint8ToHex(transferTx.message)
@@ -210,11 +227,11 @@ function verifySignature(payload: string): SignatureParams {
         }
 
         // 必須フィールドの検証
-        if (!messageJson.code_challenge) {
-          throw new Error('Missing code_challenge in transaction message')
+        if (!messageJson.challenge) {
+          throw new Error('Missing challenge in transaction message')
         }
 
-        code_challenge = messageJson.code_challenge
+        challenge = messageJson.challenge
         state = messageJson.state || undefined
         pkce_challenge = messageJson.pkce_challenge
         pkce_challenge_method = messageJson.pkce_challenge_method
@@ -231,7 +248,7 @@ function verifySignature(payload: string): SignatureParams {
   return {
     publicKey,
     address,
-    code_challenge,
+    challenge,
     state,
     pkce_challenge,
     pkce_challenge_method,

@@ -12,16 +12,76 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// 許可されたオリジンのキャッシュ
+let allowedOriginsCache: string[] = []
+let cacheLastUpdated = 0
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5分間のキャッシュ
+
+/**
+ * 許可されたオリジンを取得（キャッシュ機能付き）
+ */
+async function getCachedAllowedOrigins(): Promise<string[]> {
+  const now = Date.now()
+
+  // キャッシュが有効期限内の場合はキャッシュを返す
+  if (allowedOriginsCache.length > 0 && now - cacheLastUpdated < CACHE_TTL_MS) {
+    return allowedOriginsCache
+  }
+
+  try {
+    // MongoDBから最新のオリジンを取得
+    const mongoOrigins = await getAllowedOriginsFromMongo()
+
+    // CORS_ORIGINが設定されていることを確認
+    if (!process.env.CORS_ORIGIN) {
+      throw new Error('CORS_ORIGIN environment variable is required')
+    }
+
+    // デフォルトオリジンを追加
+    const origins = [...mongoOrigins, process.env.CORS_ORIGIN]
+
+    // キャッシュを更新
+    allowedOriginsCache = origins
+    cacheLastUpdated = now
+
+    logger.debug(`CORS origins cache updated: ${origins.length} origins`)
+    return origins
+  } catch (error) {
+    logger.error(`Failed to update CORS origins cache: ${(error as Error).message}`)
+
+    // CORS_ORIGIN未設定エラーの場合は再スロー（致命的エラー）
+    if ((error as Error).message.includes('CORS_ORIGIN environment variable is required')) {
+      throw error
+    }
+
+    // エラーの場合は既存のキャッシュまたはデフォルトを返す
+    if (allowedOriginsCache.length > 0) {
+      logger.warn('Using stale CORS origins cache due to DB error')
+      return allowedOriginsCache
+    }
+
+    // キャッシュもない場合はCORS_ORIGINのみ（設定されている場合）
+    if (!process.env.CORS_ORIGIN) {
+      throw new Error('CORS_ORIGIN environment variable is required')
+    }
+
+    return [process.env.CORS_ORIGIN]
+  }
+}
+
 // ミドルウェア設定
 app.use(
   cors({
     origin: async (origin, callback) => {
       try {
-        const allowedOrigins = await getAllowedOriginsFromMongo()
+        const allowedOrigins = await getCachedAllowedOrigins()
+
+        logger.debug(`CORS check - Origin: ${origin}, Cache size: ${allowedOrigins.length}`)
+
         if (!origin || allowedOrigins.includes(origin)) {
           callback(null, true)
         } else {
-          logger.error(`CORS blocked request from origin: ${origin}`)
+          logger.warn(`CORS blocked request from origin: ${origin}`)
           callback(new Error('Not allowed by CORS'))
         }
       } catch (error) {
@@ -29,9 +89,14 @@ app.use(
         callback(new Error('CORS origin check failed'))
       }
     },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true,
   }),
 )
+// プリフライトリクエストを明示的に処理
+app.options(/.*/, cors())
+
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'))
@@ -45,11 +110,6 @@ app.use((req, res, next) => {
 // ルート設定
 app.use('/oauth', oauthRoutes)
 app.use('/health', healthRoutes)
-
-// // Chrome DevTools用のエンドポイント（404警告を回避）
-// app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
-//   res.status(404).json({ error: 'Not implemented' })
-// })
 
 // 404ハンドラー - '*' の代わりに正規表現を使用
 app.use(/.*/, (req, res) => {
@@ -76,8 +136,17 @@ app.use((err: Error, req: express.Request, res: express.Response) => {
 // サーバー起動
 async function startServer(): Promise<void> {
   try {
+    // 環境変数の必須チェック
+    if (!process.env.CORS_ORIGIN) {
+      throw new Error('CORS_ORIGIN environment variable is required. Please set it in .env file.')
+    }
+
     await connectToMongo()
     logger.info('MongoDB connected')
+
+    // CORS許可オリジンのキャッシュを初期化
+    await getCachedAllowedOrigins()
+    logger.info(`CORS origins cache initialized with base origin: ${process.env.CORS_ORIGIN}`)
 
     app.listen(PORT, () => {
       logger.info(`Server running on http://localhost:${PORT}`)

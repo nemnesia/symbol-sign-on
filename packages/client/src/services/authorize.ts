@@ -9,8 +9,8 @@
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { Clients } from '../db/mongo.js'
-import { setChallenge } from '../db/redis.js'
-import { ChallengeDocument } from '../types/redis.types.js'
+import { setChallenge } from '../db/mongo.js'
+import { ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
 // 定数定義
@@ -57,23 +57,23 @@ export async function handleAuthorize(req: Request, res: Response): Promise<void
     const challenge = uuidv4()
 
     try {
-      // Redisに保存するチャレンジ情報を構築
-      const challengeData: ChallengeDocument = {
+      // Mongoに保存するチャレンジ情報を構築
+      const challengeData: Omit<ChallengeDocument, 'createdAt' | 'expiresAt'> = {
         challenge: challenge,
         client_id: client_id,
         redirect_uri: redirect_uri,
       }
 
-      // Redisにチャレンジ情報を保存
+      // Mongoにチャレンジ情報を保存
       await setChallenge(challenge, challengeData, CHALLENGE_EXPIRES_IN)
     } catch (err) {
-      // Redis保存エラー
+      // Mongo保存エラー
       handleError(
         res,
         500,
         'server_error',
-        'Redis error',
-        `/oauth/authorize Redis error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}, error=${(err as Error).stack || (err as Error).message}`,
+        'Database error',
+        `/oauth/authorize Database error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}, error=${(err as Error).stack || (err as Error).message}`,
       )
       return
     }

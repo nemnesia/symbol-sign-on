@@ -4,9 +4,9 @@
  */
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
-import { setAccessTokenBlacklist } from '../db/redis.js'
+import { setAccessTokenBlacklist } from '../db/mongo.js'
 import { JWTPayload } from '../types/jwt.types.js'
-import { AccessTokenBlacklistDocument } from '../types/redis.types.js'
+import { AccessTokenBlacklistDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from './time.js'
 
@@ -65,7 +65,7 @@ export async function verifyAndRevokeJWT(jwtId: string): Promise<JWTPayload | nu
  * @param jwtId JWT ID（アクセストークン）
  */
 function addBlacklistEntry(jwtId: string): void {
-  const accessTokenBlacklistDocument: AccessTokenBlacklistDocument = {
+  const accessTokenBlacklistDocument: Omit<AccessTokenBlacklistDocument, 'createdAt' | 'expiresAt'> = {
     jwt_id: jwtId,
     revoked_at: new Date(),
   }

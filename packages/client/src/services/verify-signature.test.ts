@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteChallenge, getChallenge, setAuthCode } from '../db/redis.js'
+import { deleteChallenge, getChallenge, setAuthCode } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleVerifySignature } from './verify-signature.js'
 
@@ -14,7 +14,7 @@ interface ChallengeDocument {
 }
 
 // モック設定
-vi.mock('../db/redis.js')
+vi.mock('../db/mongo.js')
 vi.mock('../utils/logger.js', () => ({
   default: {
     error: vi.fn(),

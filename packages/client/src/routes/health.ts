@@ -17,63 +17,22 @@ async function checkMongoConnection(): Promise<boolean> {
   }
 }
 
-// Redis接続確認用のヘルパー関数
-async function checkRedisConnection(): Promise<boolean> {
-  const timeout = 3000 // 3秒タイムアウト
-
-  return new Promise((resolve) => {
-    // タイムアウトタイマーを設定
-    const timeoutId = setTimeout(() => {
-      logger.info('Redis ping timeout after 3 seconds')
-      resolve(false)
-    }, timeout)
-
-    // 非同期処理を実行
-    ;(async () => {
-      try {
-        const { getRedisClient } = await import('../db/redis.js')
-        const redisClient = getRedisClient()
-
-        if (!redisClient) {
-          logger.info('Redis client is null')
-          clearTimeout(timeoutId)
-          resolve(false)
-          return
-        }
-
-        logger.info('Attempting Redis ping...')
-        const pong = await redisClient.ping()
-        logger.info(`Redis ping response: ${pong}`)
-
-        clearTimeout(timeoutId)
-        resolve(pong === 'PONG')
-      } catch (error) {
-        logger.error('Redis ping error:', error)
-        clearTimeout(timeoutId)
-        resolve(false)
-      }
-    })()
-  })
-}
-
 // ヘルスチェックエンドポイント
 router.get('/', async (req, res) => {
   try {
     const mongoStatus = await checkMongoConnection()
-    const redisStatus = await checkRedisConnection()
 
     const healthStatus = {
-      status: mongoStatus && redisStatus ? 'OK' : 'DEGRADED',
+      status: mongoStatus ? 'OK' : 'DEGRADED',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       uptime: process.uptime(),
       database: mongoStatus ? 'connected' : 'disconnected',
-      redis: redisStatus ? 'connected' : 'disconnected',
       memory: process.memoryUsage(),
       environment: process.env.NODE_ENV || 'development',
     }
 
-    const statusCode = mongoStatus && redisStatus ? 200 : 503
+    const statusCode = mongoStatus ? 200 : 503
     res.status(statusCode).json(healthStatus)
   } catch (error) {
     logger.error(`Health check failed: ${(error as Error).message}`)

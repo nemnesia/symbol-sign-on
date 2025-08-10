@@ -2,7 +2,6 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
 import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
-import { connectToRedis } from './db/redis.js'
 import healthRoutes from './routes/health.js'
 import oauthRoutes from './routes/oauth.js'
 import logger from './utils/logger.js'
@@ -47,13 +46,13 @@ app.use((req, res, next) => {
 app.use('/oauth', oauthRoutes)
 app.use('/health', healthRoutes)
 
-// Chrome DevTools用のエンドポイント（404警告を回避）
-app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
-  res.status(404).json({ error: 'Not implemented' })
-})
+// // Chrome DevTools用のエンドポイント（404警告を回避）
+// app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+//   res.status(404).json({ error: 'Not implemented' })
+// })
 
-// 404ハンドラー
-app.use('*', (req, res) => {
+// 404ハンドラー - '*' の代わりに正規表現を使用
+app.use(/.*/, (req, res) => {
   const isDevToolsRequest =
     req.originalUrl.includes('/.well-known/') ||
     req.originalUrl.includes('/favicon.ico') ||
@@ -80,9 +79,6 @@ async function startServer(): Promise<void> {
     await connectToMongo()
     logger.info('MongoDB connected')
 
-    await connectToRedis()
-    logger.info('Redis connected')
-
     app.listen(PORT, () => {
       logger.info(`Server running on http://localhost:${PORT}`)
       logger.info(`API endpoints:`)
@@ -103,7 +99,6 @@ async function startServer(): Promise<void> {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
 })
-
 // 未処理の例外をキャッチ
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error)
@@ -115,9 +110,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
   logger.info(`${signal} received, shutting down gracefully`)
   try {
     const { closeConnection: closeMongoConnection } = await import('./db/mongo.js')
-    const { closeConnection: closeRedisConnection } = await import('./db/redis.js')
     await closeMongoConnection()
-    await closeRedisConnection()
   } catch (error) {
     logger.error(`Error during shutdown: ${(error as Error).message}`)
   }

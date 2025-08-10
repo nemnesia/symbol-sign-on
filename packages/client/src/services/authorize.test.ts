@@ -1,12 +1,12 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Clients } from '../db/mongo.js'
-import { setChallenge } from '../db/redis.js'
+import { setChallenge } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
 
 // モック設定
-vi.mock('../db/redis.js')
+vi.mock('../db/mongo.js')
 vi.mock('../db/mongo.js', () => ({
   Clients: {
     findOne: vi.fn(),

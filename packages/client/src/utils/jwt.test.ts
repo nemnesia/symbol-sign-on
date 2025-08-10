@@ -1,10 +1,10 @@
 import jwt from 'jsonwebtoken'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as redis from '../db/redis.js'
+import * as mongo from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { generateJWT, verifyAndRevokeJWT } from './jwt.js'
 
-vi.mock('../db/redis.js')
+vi.mock('../db/mongo.js')
 vi.mock('../utils/logger.js', () => ({
   default: {
     error: vi.fn(),
@@ -48,7 +48,7 @@ describe('JWTユーティリティ', () => {
 
   it('verifyAndRevokeJWTで無効なJWTはnullを返しブラックリスト追加される', async () => {
     const invalidToken = 'invalid.jwt.token'
-    const setAccessTokenBlacklist = vi.spyOn(redis, 'setAccessTokenBlacklist')
+    const setAccessTokenBlacklist = vi.spyOn(mongo, 'setAccessTokenBlacklist')
     const result = await verifyAndRevokeJWT(invalidToken)
     expect(result).toBeNull()
     expect(setAccessTokenBlacklist).toHaveBeenCalledWith(

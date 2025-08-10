@@ -1,11 +1,11 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/redis.js'
+import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/mongo.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
 import { handleToken } from './token.js'
 
-vi.mock('../db/redis.js')
+vi.mock('../db/mongo.js')
 vi.mock('../utils/jwt.js')
 vi.mock('../utils/logger.js', () => ({
   default: {

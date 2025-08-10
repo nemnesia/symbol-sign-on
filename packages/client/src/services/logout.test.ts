@@ -1,10 +1,10 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getRefreshToken, setRefreshToken } from '../db/redis.js'
+import { getRefreshToken, setRefreshToken } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleLogout } from './logout.js'
 
-vi.mock('../db/redis.js')
+vi.mock('../db/mongo.js')
 vi.mock('../utils/logger.js', () => ({
   default: {
     error: vi.fn(),

@@ -9,8 +9,8 @@
 import crypto from 'crypto'
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/redis.js'
-import { AuthCodeDocument, RefreshTokenDocument } from '../types/redis.types.js'
+import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/mongo.js'
+import { AuthCodeDocument, RefreshTokenDocument } from '../types/mongo.types.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
@@ -144,7 +144,7 @@ async function handleAuthorizationCodeGrant(
 
   // リフレッシュトークン保存
   try {
-    const refreshTokenDoc: RefreshTokenDocument = {
+    const refreshTokenDoc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
       refresh_token: refreshToken,
       address: authCodeDoc.address,
       publicKey: authCodeDoc.publicKey,
@@ -201,7 +201,7 @@ async function handleRefreshTokenGrant(res: Response, refreshToken: string, clie
 
   // 新しいリフレッシュトークン保存
   try {
-    const newRefreshTokenDoc: RefreshTokenDocument = {
+    const newRefreshTokenDoc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
       refresh_token: newRefreshToken,
       address: refreshTokenDoc.address,
       publicKey: refreshTokenDoc.publicKey,

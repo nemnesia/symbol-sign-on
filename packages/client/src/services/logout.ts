@@ -2,8 +2,8 @@
  * ログアウトサービス
  */
 import { Request, Response } from 'express'
-import { getRefreshToken, setRefreshToken } from '../db/redis.js'
-import { RefreshTokenDocument } from '../types/redis.types.js'
+import { getRefreshToken, setRefreshToken } from '../db/mongo.js'
+import { RefreshTokenDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
 /**
@@ -45,7 +45,7 @@ export async function handleLogout(req: Request, res: Response): Promise<void> {
 
     // リフレッシュトークンを取り消し
     try {
-      const updatedRefreshToken: RefreshTokenDocument = {
+      const updatedRefreshToken: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
         refresh_token: refreshTokenDoc.refresh_token,
         address: refreshTokenDoc.address,
         publicKey: refreshTokenDoc.publicKey,

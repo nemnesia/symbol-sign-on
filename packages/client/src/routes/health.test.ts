@@ -28,14 +28,6 @@ describe('Health Check Route', () => {
     vi.resetModules()
   })
 
-  it('GET /health should respond 503 if redis fails', async () => {
-    // Redisのモック: getRedisClientがnullを返すようにする
-    vi.mock('../db/redis.js', () => ({ getRedisClient: () => null }))
-    const res = await request(app).get('/health')
-    expect(res.statusCode).toBe(503)
-    vi.resetModules()
-  })
-
   it('GET /health should respond 503 on error', async () => {
     // モジュールの読み込み時にエラーが発生するようなモックを作成
     vi.doMock('../db/mongo.js', () => {
@@ -74,41 +66,6 @@ describe('Health Check Route', () => {
     const res = await request(errorApp).get('/health')
     expect(res.statusCode).toBe(503)
     vi.doUnmock('../db/mongo.js')
-    vi.resetModules()
-  })
-
-  it('GET /health should respond 503 if redis ping throws', async () => {
-    vi.doMock('../db/redis.js', () => ({
-      getRedisClient: () => ({
-        ping: async () => {
-          throw new Error('redis ping error')
-        },
-      }),
-    }))
-    vi.resetModules()
-    const { default: errorHealthRouter } = await import('./health.js')
-    const errorApp = express()
-    errorApp.use('/health', errorHealthRouter)
-    const res = await request(errorApp).get('/health')
-    expect(res.statusCode).toBe(503)
-    vi.doUnmock('../db/redis.js')
-    vi.resetModules()
-  })
-
-  it('GET /health should respond 503 if redis times out', async () => {
-    // Redis pingがタイムアウトするようにsetTimeoutだけを使うモック
-    vi.doMock('../db/redis.js', () => ({
-      getRedisClient: () => ({
-        ping: async () => new Promise((resolve) => setTimeout(() => resolve('PONG'), 5000)), // 5秒でPONG
-      }),
-    }))
-    vi.resetModules()
-    const { default: errorHealthRouter } = await import('./health.js')
-    const errorApp = express()
-    errorApp.use('/health', errorHealthRouter)
-    const res = await request(errorApp).get('/health')
-    expect(res.statusCode).toBe(503)
-    vi.doUnmock('../db/redis.js')
     vi.resetModules()
   })
 })

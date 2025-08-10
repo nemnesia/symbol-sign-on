@@ -10,8 +10,8 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { models, SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { v4 as uuidv4 } from 'uuid'
-import { deleteChallenge, getChallenge, setAuthCode } from '../db/redis.js'
-import { AuthCodeDocument, ChallengeDocument } from '../types/redis.types.js'
+import { deleteChallenge, getChallenge, setAuthCode } from '../db/mongo.js'
+import { AuthCodeDocument, ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
 
@@ -98,7 +98,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     const authCode = uuidv4()
     try {
       // 型定義に合わせて作成
-      const authCodeData: AuthCodeDocument = {
+      const authCodeData: Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'> = {
         auth_code: authCode,
         address: signatureParams.address,
         publicKey: signatureParams.publicKey,
@@ -116,8 +116,8 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     // チャレンジを削除
     try {
       await deleteChallenge(signatureParams.code_challenge)
-    } catch (redisError) {
-      logger.error(`Failed to delete challenge from Redis: ${(redisError as Error).message}`)
+    } catch (dbError) {
+      logger.error(`Failed to delete challenge from database: ${(dbError as Error).message}`)
       // チャレンジ削除失敗は致命的ではないので続行
     }
 

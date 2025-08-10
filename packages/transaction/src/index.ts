@@ -1,9 +1,9 @@
 import { base32ToHexAddress, publicKeyToAddress } from './address'
 
-export const createSingTx = (networkNumber: number, message: string) => {
+export const createSignTx = (networkNumber: number, message: string) => {
   const len = 160 + message.length
   const sizeHex = len.toString(16).padStart(8, '0').toUpperCase()
-  const size = sizeHex.match(/.{2}/g)?.reverse().join('') || ''
+  const size = sizeHex.match(/.{2}/g)?.reverse().join('')
 
   const verifiableEntityHeaderReserved_1 = '00000000'
   const signature =
@@ -30,7 +30,7 @@ export const createSingTx = (networkNumber: number, message: string) => {
     .toString(16)
     .padStart(4, '0')
     .toUpperCase()
-  const messageSize = messageSizeHex.match(/.{2}/g)?.reverse().join('') || ''
+  const messageSize = messageSizeHex.match(/.{2}/g)!.reverse().join('')
   const messageHex = Array.from(encodedMessage, (byte) =>
     byte.toString(16).padStart(2, '0'),
   )

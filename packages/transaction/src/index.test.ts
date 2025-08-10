@@ -1,74 +1,74 @@
 import { describe, it, expect } from 'vitest'
-import { createSingTx } from '../src/index'
+import { createSignTx } from '../src/index'
 
-describe('createSingTx', () => {
-  describe('basic functionality', () => {
-    it('should create a transaction for testnet', () => {
-      const result = createSingTx(152, 'Hello Symbol!')
-
-      expect(typeof result).toBe('string')
-      expect(result.length).toBeGreaterThan(0)
-      expect(result).toMatch(/^[0-9A-F]+$/) // Should be uppercase hex
-    })
-
-    it('should create a transaction for mainnet', () => {
-      const result = createSingTx(104, 'Hello Symbol!')
+describe('createSignTx', () => {
+  describe('基本機能', () => {
+    it('テストネット用のトランザクションを作成できる', () => {
+      const result = createSignTx(152, 'Hello Symbol!')
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
       expect(result).toMatch(/^[0-9A-F]+$/) // Should be uppercase hex
     })
 
-    it('should create different transactions for different networks', () => {
-      const testnetTx = createSingTx(152, 'Hello')
-      const mainnetTx = createSingTx(104, 'Hello')
+    it('メインネット用のトランザクションを作成できる', () => {
+      const result = createSignTx(104, 'Hello Symbol!')
+
+      expect(typeof result).toBe('string')
+      expect(result.length).toBeGreaterThan(0)
+      expect(result).toMatch(/^[0-9A-F]+$/) // Should be uppercase hex
+    })
+
+    it('異なるネットワークで異なるトランザクションを作成できる', () => {
+      const testnetTx = createSignTx(152, 'Hello')
+      const mainnetTx = createSignTx(104, 'Hello')
 
       expect(testnetTx).not.toBe(mainnetTx)
     })
 
-    it('should create different transactions for different messages', () => {
-      const tx1 = createSingTx(152, 'Hello')
-      const tx2 = createSingTx(152, 'World')
+    it('異なるメッセージで異なるトランザクションを作成できる', () => {
+      const tx1 = createSignTx(152, 'Hello')
+      const tx2 = createSignTx(152, 'World')
 
       expect(tx1).not.toBe(tx2)
     })
   })
 
-  describe('message handling', () => {
-    it('should handle empty message', () => {
-      const result = createSingTx(152, '')
+  describe('メッセージ処理', () => {
+    it('空のメッセージを処理できる', () => {
+      const result = createSignTx(152, '')
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
-    it('should handle Japanese text', () => {
-      const result = createSingTx(152, 'こんにちは')
+    it('日本語テキストを処理できる', () => {
+      const result = createSignTx(152, 'こんにちは')
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
-    it('should handle emoji', () => {
-      const result = createSingTx(152, '🚀💎')
+    it('絵文字を処理できる', () => {
+      const result = createSignTx(152, '🚀💎')
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
-    it('should handle long message', () => {
+    it('長いメッセージを処理できる', () => {
       const longMessage = 'A'.repeat(1000)
-      const result = createSingTx(152, longMessage)
+      const result = createSignTx(152, longMessage)
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
   })
 
-  describe('transaction structure', () => {
-    it('should have correct transaction size in header', () => {
+  describe('トランザクション構造', () => {
+    it('ヘッダーに正しいトランザクションサイズが含まれる', () => {
       const message = 'Test'
-      const result = createSingTx(152, message)
+      const result = createSignTx(152, message)
 
       // Transaction starts with size (4 bytes = 8 hex chars)
       expect(result.length).toBeGreaterThanOrEqual(8)
@@ -87,45 +87,46 @@ describe('createSingTx', () => {
       expect(sizeBytes).toBe(expectedSize)
     })
 
-    it('should contain network type in transaction', () => {
-      const testnetTx = createSingTx(152, 'test')
-      const mainnetTx = createSingTx(104, 'test')
+    it('トランザクションにネットワークタイプが含まれる', () => {
+      const testnetTx = createSignTx(152, 'test')
+      const mainnetTx = createSignTx(104, 'test')
 
       // Network type should be different in the transactions
       expect(testnetTx).toContain('98') // 152 in hex
       expect(mainnetTx).toContain('68') // 104 in hex
     })
 
-    it('should be deterministic for same inputs', () => {
-      const tx1 = createSingTx(152, 'Hello')
-      const tx2 = createSingTx(152, 'Hello')
+    it('同じ入力で決定論的である', () => {
+      const tx1 = createSignTx(152, 'Hello')
+      const tx2 = createSignTx(152, 'Hello')
 
       expect(tx1).toBe(tx2)
     })
   })
 
-  describe('edge cases', () => {
-    it('should handle special characters', () => {
+  describe('エッジケース', () => {
+    it('特殊文字を処理できる', () => {
       const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?'
-      const result = createSingTx(152, specialChars)
+      const result = createSignTx(152, specialChars)
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
-    it('should handle unicode characters', () => {
+    it('ユニコード文字を処理できる', () => {
       const unicode = '🌟✨💫⭐🎆'
-      const result = createSingTx(152, unicode)
+      const result = createSignTx(152, unicode)
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
 
-    it('should handle very short network numbers', () => {
-      const result = createSingTx(1, 'test')
+    it('非常に短いネットワーク番号を処理できる', () => {
+      const result = createSignTx(1, 'test')
 
       expect(typeof result).toBe('string')
       expect(result.length).toBeGreaterThan(0)
     })
   })
+  
 })

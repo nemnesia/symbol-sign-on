@@ -211,7 +211,7 @@
     </div>
 
     <script type="module">
-        import { createSingTx } from './dist/symbol-sign-tx.mjs';
+        import { createSignTx } from './dist/symbol-sign-tx.mjs';
 
         // ネットワーク選択の処理
         document.querySelectorAll('.network-card').forEach(card => {
@@ -236,7 +236,7 @@
 
             try {
                 // 転送トランザクション生成
-                const transaction = createSingTx(networkNumber, message);
+                const transaction = createSignTx(networkNumber, message);
 
                 // 結果を表示
                 showResult(transaction, networkNumber, message);
@@ -311,11 +311,11 @@
         window.addEventListener('load', () => {
             try {
                 // 関数が正常にインポートできるかテスト
-                if (typeof createSingTx === 'function') {
+                if (typeof createSignTx === 'function') {
                     console.log('✅ createSingTx function successfully imported');
 
                     // 簡単なテスト実行
-                    const testTx = createSingTx(152, 'test');
+                    const testTx = createSignTx(152, 'test');
                     console.log('✅ Test transaction generated:', testTx.substring(0, 50) + '...');
                 } else {
                     throw new Error('createSingTx function not found');

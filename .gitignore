@@ -16,6 +16,7 @@ build
 
 # Environment variables
 .env
+.env.dev
 .env.local
 .env.development.local
 .env.test.local

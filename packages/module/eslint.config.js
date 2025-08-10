@@ -14,6 +14,9 @@ export default [
       globals: {
         console: 'readonly',
         fetch: 'readonly',
+        navigator: 'readonly',
+        global: 'readonly',
+        document: 'readonly',
       },
     },
     plugins: {

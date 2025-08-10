@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenge Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .container {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #bbbbbb;
+        }
+
+        input {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            padding: 10px;
+            width: 100%;
+        }
+
+        button {
+            background-color: #007acc;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #005999;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .result h3 {
+            margin-top: 0;
+            color: #ffffff !important;
+        }
+
+        .transaction-hex {
+            background-color: #1e1e1e !important;
+            border: 1px solid #444 !important;
+            color: #00ff00 !important;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Challenge Demo</h1>
+
+        <form id="challengeForm">
+            <div class="form-group">
+                <label for="client_id">Client ID</label>
+                <input type="text" id="client_id" placeholder="Enter client ID" value="module-demo">
+            </div>
+            <div class="form-group">
+                <label for="redirect_uri">Redirect URI</label>
+                <input type="text" id="redirect_uri" placeholder="Enter redirect URI" value="http://localhost:3000/callback.html">
+            </div>
+            <div class="form-group">
+                <label for="base_url">Base URL</label>
+                <input type="text" id="base_url" placeholder="Enter base URL" value="http://localhost:3510">
+            </div>
+            <button type="submit">Get Challenge</button>
+            <button type="button" id="clearResult">Clear Result</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>Challenge Result</h3>
+            <div id="challengeInfo"></div>
+            <div class="transaction-hex" id="challengeHex"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { getChallenge } from './dist/symbol-sign-on.mjs';
+
+        document.getElementById('challengeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const clientId = document.getElementById('client_id').value;
+            const redirectUri = document.getElementById('redirect_uri').value;
+            const baseUrl = document.getElementById('base_url').value;
+
+            try {
+                const result = await getChallenge({
+                    client_id: clientId,
+                    redirect_uri: redirectUri,
+                }, baseUrl);
+
+                if (result.error) {
+                    showError(result.error, result);
+                } else {
+                    showResult(result);
+                }
+            } catch (error) {
+                console.error('Unexpected error:', error);
+                showError('Unexpected error occurred.', { message: error.message });
+            }
+        });
+
+        document.getElementById('clearResult').addEventListener('click', () => {
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('challengeInfo').innerHTML = '';
+            document.getElementById('challengeHex').textContent = '';
+        });
+
+        function showResult(result) {
+            const resultDiv = document.getElementById('result');
+            const challengeInfo = document.getElementById('challengeInfo');
+            const challengeHex = document.getElementById('challengeHex');
+
+            challengeInfo.innerHTML = `
+                <p><strong>Client ID:</strong> ${result.client_id}</p>
+                <p><strong>Redirect URI:</strong> ${result.redirect_uri}</p>
+                <p><strong>Challenge:</strong> ${result.challenge}</p>
+            `;
+
+            challengeHex.textContent = JSON.stringify(result, null, 2);
+            resultDiv.style.display = 'block';
+        }
+
+        function showError(message, errorObject = {}) {
+            const resultDiv = document.getElementById('result');
+            const challengeInfo = document.getElementById('challengeInfo');
+            const challengeHex = document.getElementById('challengeHex');
+
+            challengeInfo.innerHTML = `<p><strong>Error:</strong> ${message}</p>`;
+            challengeHex.textContent = JSON.stringify(errorObject, null, 2);
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

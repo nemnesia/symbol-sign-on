@@ -1,30 +1,86 @@
 import typescript from "@rollup/plugin-typescript";
-import { terser } from "rollup-plugin-terser";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
+import json from '@rollup/plugin-json';
+import terser from '@rollup/plugin-terser';
+import { visualizer } from 'rollup-plugin-visualizer';
+import nodePolyfills from 'rollup-plugin-polyfill-node';
 
-export default [
-  // ESM/CJS
-  {
-    input: "src/index.ts",
-    output: [
-      { file: "dist/index.cjs", format: "cjs", exports: "named" },
-      { file: "dist/index.mjs", format: "esm" },
-    ],
-    plugins: [typescript()],
-    external: ["@noble/hashes/legacy", "@noble/hashes/sha3"], // 依存パッケージ名を記載
+export default {
+  input: "src/index.ts",
+  output: {
+    file: "dist/symbol-sign-on.mjs",
+    format: "es",
+    sourcemap: true,
   },
-  // UMD
-  {
-    input: "src/index.ts",
-    output: {
-      file: "dist/symbol-sign-on.umd.js",
-      format: "umd",
-      name: "SymbolSignOn",
-      exports: "default",
-    },
-    plugins: [
-      typescript(),
-       terser()
-      ],
-    external: () => false, // 関数で明示的にすべての依存をバンドルに含める
+  plugins: [
+    nodePolyfills(),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false,
+      // tree shakingを有効にする
+      modulesOnly: true,
+      // 特定の依存関係のみを解決
+      exportConditions: ['module', 'import', 'browser'],
+    }),
+    json(),
+    commonjs({
+      // tree shakingのサポートを向上
+      requireReturnsDefault: "auto",
+      // side effectsのない変換を強制
+      ignoreDynamicRequires: true,
+    }),
+    typescript({
+      // tree shakingを有効にするための設定
+      module: "esnext",
+      target: "es2020", // より互換性のあるターゲットに変更
+      declaration: false, // ビルド時は型定義を生成しない
+    }),
+    terser({
+      // 未使用コードの削除を強化
+      compress: {
+        unused: true,
+        dead_code: true,
+        drop_debugger: true,
+        drop_console: false,
+        pure_funcs: [],
+        // BigInt関連の問題を避けるため最適化を控えめに
+        passes: 1,
+        pure_getters: false,
+        unsafe: false,
+        unsafe_comps: false,
+        unsafe_math: false,
+        unsafe_methods: false,
+        // BigInt値の変換を避ける
+        evaluate: false,
+        reduce_vars: false,
+      },
+      mangle: {
+        toplevel: true,
+        properties: {
+          regex: /^_/,
+        },
+      },
+      // BigInt関連のエラーを避けるため
+      ecma: 2020,
+    }),
+    // バンドルサイズの分析レポートを生成
+    visualizer({
+      filename: 'dist/bundle-stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
+  external: [],
+
+  // tree shakingの最適化
+  treeshake: {
+    moduleSideEffects: false,
+    propertyReadSideEffects: false,
+    tryCatchDeoptimization: false,
+    unknownGlobalSideEffects: false,
+    // より積極的な未使用コード削除
+    preset: 'recommended',
   },
-];
+};

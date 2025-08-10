@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Challenge Response Demo</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+
+    .container {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      color: #ffffff;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #bbbbbb;
+    }
+
+    input {
+      background-color: #2c2c2c;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+      padding: 10px;
+      width: 100%;
+    }
+
+    button {
+      background-color: #007acc;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #005999;
+    }
+
+    .result {
+      margin-top: 30px;
+      padding: 20px;
+      background-color: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+
+    .result h3 {
+      margin-top: 0;
+      color: #ffffff !important;
+    }
+
+    .transaction-hex {
+      background-color: #1e1e1e !important;
+      border: 1px solid #444 !important;
+      color: #00ff00 !important;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+  <script>
+    // SSSModuleの定義
+    !function (e, t) { "object" == typeof exports && "undefined" != typeof module ? t(exports) : "function" == typeof define && define.amd ? define(["exports"], t) : t((e = "undefined" != typeof globalThis ? globalThis : e || self).SSSModule = {}) }(this, function (e) { "use strict"; e.getActiveAccountToken = (e, t, i) => { if ("string" == typeof e) return window.SSS.getActiveAccountToken(e, t, i); { const n = e.publicKey; return e.address.pretty().charAt(0) !== window.SSS.activeAddress.charAt(0) ? new Promise((e, t) => { t("Incorrect network type") }) : window.SSS.getActiveAccountToken(n, t, i) } }, e.getActiveAddress = () => window.SSS.activeAddress, e.getActiveName = () => window.SSS.activeName, e.getActiveNetworkType = () => window.SSS.activeNetworkType, e.getActivePublicKey = () => window.SSS.activePublicKey, e.isAllowedSSS = () => !!window.SSS, e.requestSSS = () => window.requestSSS(), e.requestSign = () => window.SSS.requestSign(), e.requestSignCosignatureTransaction = () => window.SSS.requestSignCosignatureTransaction(), e.requestSignEncription = () => window.SSS.requestSignEncription(), e.requestSignWithCosignatories = e => window.SSS.requestSignWithCosignatories(e), e.setMessage = (e, t) => { window.SSS.setMessage(e, t) }, e.setTransaction = e => window.SSS.setTransaction(e), e.setTransactionByPayload = e => window.SSS.setTransactionByPayload(e) });
+  </script>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Challenge Response Demo</h1>
+
+    <form id="challengeForm">
+      <div class="form-group">
+        <label for="client_id">クライアントID</label>
+        <input type="text" id="client_id" placeholder="クライアントIDを入力" value="module-demo">
+      </div>
+      <div class="form-group">
+        <label for="redirect_uri">リダイレクトURI</label>
+        <input type="text" id="redirect_uri" placeholder="リダイレクトURIを入力" value="http://localhost:3000/callback.html">
+      </div>
+      <div class="form-group">
+        <label for="state">State: ユニークな状態識別子を生成（リダイレクト後に検証するため）</label>
+        <input type="text" id="state" placeholder="Stateを入力">
+      </div>
+      <div class="form-group">
+        <label for="pkce_challenge">PKCEチャレンジ: 認可コードからアクセストークンを取得する際に使用</label>
+        <input type="text" id="pkce_challenge" placeholder="PKCEチャレンジを入力">
+      </div>
+      <div class="form-group">
+        <label for="pkce_challenge_method">PKCEチャレンジメソッド</label>
+        <input type="text" id="pkce_challenge_method" placeholder="PKCEチャレンジメソッドを入力">
+      </div>
+      <div class="form-group">
+        <label for="base_url">ベースURL</label>
+        <input type="text" id="base_url" placeholder="ベースURLを入力" value="http://localhost:3510">
+      </div>
+      <button type="submit" id="symbol-auth-btn">認可コード取得</button>
+      <button type="button" id="clearResult">結果をクリア</button>
+    </form>
+
+    <div id="result" class="result" style="display: none;">
+      <h3>Challenge & Transaction Result</h3>
+      <div id="challengeInfo"></div>
+      <div class="transaction-hex" id="challengeHex"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { getChallenge, createSignTx, isMobileDevice, verifySignature } from './dist/symbol-sign-on.mjs';
+
+    document.getElementById('challengeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      console.log('Form submitted');
+
+      // フォームから値を取得
+      const clientId = document.getElementById('client_id').value;
+      const redirectUri = document.getElementById('redirect_uri').value;
+      const baseUrl = document.getElementById('base_url').value;
+      const state = document.getElementById('state').value;
+      const pkceChallenge = document.getElementById('pkce_challenge').value;
+      const pkceChallengeMethod = document.getElementById('pkce_challenge_method').value;
+
+      if (!clientId || !redirectUri || !baseUrl) {
+        showError('すべてのフィールドを入力してください');
+        return;
+      }
+
+      try {
+        // チャレンジコードを取得
+        console.log('Requesting challenge...', { clientId, redirectUri, baseUrl });
+
+        const challengeResponse = await getChallenge({
+          client_id: clientId,
+          redirect_uri: redirectUri
+        }, baseUrl);
+
+        console.log('Challenge response:', challengeResponse);
+
+        // エラーチェック
+        if ('error' in challengeResponse) {
+          showError('チャレンジの取得に失敗しました: ' + challengeResponse.error_description, challengeResponse);
+          return;
+        }
+        if (!challengeResponse.challenge) {
+          showError('チャレンジコードが取得できませんでした', challengeResponse);
+          return;
+        }
+
+        // トランザクションを作成 (testnetを使用、メッセージにチャレンジを含める)
+        const messageJson = {
+          challenge: challengeResponse.challenge,
+          state: state,
+          pkce_challenge: pkceChallenge,
+          pkce_challenge_method: pkceChallengeMethod
+        };
+        console.log('Creating transaction with challenge:', JSON.stringify(messageJson, null, 2));
+        const message = '\0' + JSON.stringify(messageJson); // null文字でプリフィックス
+        const transactionHex = createSignTx('testnet', message);
+
+        console.log('Transaction hex created:', transactionHex);
+
+        if (isMobileDevice()) {
+          console.log(('モバイルデバイスでの処理を実行'));
+        } else {
+          console.log(('デスクトップデバイスでの処理を実行'));
+          if (SSSModule.requestSSS()) {
+            SSSModule.setTransactionByPayload(transactionHex);
+            SSSModule.requestSign().then((signedTx) => {
+              console.log('署名されたトランザクション:', signedTx.payload);
+              // 署名検証エンドポイントにデータを送信
+              submitSignatureForVerification(signedTx.payload);
+            }).catch((error) => {
+              console.error('署名エラー:', error);
+              showError('署名に失敗しました: ' + error.message);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error during challenge/transaction process:', error);
+        showError('エラーが発生しました: ' + error.message, {
+          error: error.message,
+          stack: error.stack
+        });
+      }
+    });
+
+    // 結果をクリア
+    document.getElementById('clearResult').addEventListener('click', () => {
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('challengeInfo').innerHTML = '';
+      document.getElementById('challengeHex').textContent = '';
+    });
+
+    // エラーメッセージを表示する関数
+    function showError(message, errorObject = {}) {
+      const resultDiv = document.getElementById('result');
+      const challengeInfo = document.getElementById('challengeInfo');
+      const challengeHex = document.getElementById('challengeHex');
+
+      challengeInfo.innerHTML = `<p><strong>Error:</strong> ${message}</p>`;
+      challengeHex.textContent = JSON.stringify(errorObject, null, 2);
+      resultDiv.style.display = 'block';
+    }
+
+    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+    // 署名検証のためのデータ送信関数
+    // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+    function submitSignatureForVerification(signedTx) {
+      const baseUrl = document.getElementById('base_url').value;
+      verifySignature(signedTx, baseUrl);
+
+    }
+
+    // ページ読み込み時にStateとPKCEチャレンジを生成
+    document.addEventListener('DOMContentLoaded', () => {
+      async function generateStateAndPKCE() {
+        const state = crypto.randomUUID();
+
+        // PKCEのためのcode_verifierを生成
+        const codeVerifier = crypto.randomUUID();
+        console.log('Generated code_verifier:', codeVerifier);
+        const encoder = new TextEncoder();
+        const data = encoder.encode(codeVerifier);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const pkceChallenge = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        console.log('Generated pkce_challenge:', pkceChallenge);
+
+        document.getElementById('state').value = state;
+        document.getElementById('pkce_challenge').value = pkceChallenge;
+        document.getElementById('pkce_challenge_method').value = 'S256';
+
+        console.log('Generated state and PKCE challenge on page load:', { state, pkceChallenge });
+      }
+      generateStateAndPKCE();
+    });
+  </script>
+</body>
+
+</html>

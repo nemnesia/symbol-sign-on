@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbol Transaction Generator Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .container {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #bbbbbb;
+        }
+
+        input,
+        select,
+        textarea {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            padding: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            resize: none;
+        }
+
+        button {
+            background-color: #007acc;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #005999;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+
+        .result h3 {
+            margin-top: 0;
+            color: #ffffff !important;
+            /* 明るい白色で視認性を向上 */
+        }
+
+        .transaction-hex {
+            background-color: #1e1e1e !important;
+            border: 1px solid #444 !important;
+            color: #00ff00 !important;
+            /* 明るい緑色で視認性を向上 */
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .info {
+            background-color: #1e88e5;
+            border: 1px solid #1565c0;
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .error {
+            background-color: #d32f2f;
+            border: 1px solid #b71c1c;
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .success {
+            background-color: #388e3c;
+            border: 1px solid #1b5e20;
+            color: #ffffff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .network-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .network-card {
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .network-card.selected {
+            border-color: #007acc;
+            background-color: #1e88e5;
+        }
+
+        .network-card h4 {
+            margin: 0 0 10px 0;
+            color: #ffffff;
+        }
+
+        .network-card p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #ffffff !important;
+            /* 明るい白色で視認性を向上 */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Symbol Transaction Generator Test</h1>
+
+        <div class="info">
+            <strong>このテストページについて:</strong><br>
+            ビルドされたsymbol-sign-tx.mjsを使用してSymbol転送トランザクションを生成し、生成されたトランザクションのペイロードを確認できます。
+        </div>
+
+        <form id="transactionForm">
+            <div class="form-group">
+                <label for="network">ネットワーク:</label>
+                <div class="network-info">
+                    <div class="network-card" data-network="104">
+                        <h4>Mainnet</h4>
+                        <p>Network ID: 104 (0x68)</p>
+                        <p>本番ネットワーク</p>
+                    </div>
+                    <div class="network-card selected" data-network="152">
+                        <h4>Testnet</h4>
+                        <p>Network ID: 152 (0x98)</p>
+                        <p>テスト用ネットワーク</p>
+                    </div>
+                </div>
+                <input type="hidden" id="network" value="152">
+            </div>
+
+            <div class="form-group">
+                <label for="message">メッセージ:</label>
+                <textarea id="message" rows="4" placeholder="送信するメッセージを入力してください">こんにちは Symbol!!</textarea>
+            </div>
+
+            <button type="submit">転送トランザクション生成</button>
+            <button type="button" id="clearResult">結果をクリア</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>生成された転送トランザクション</h3>
+            <div id="transactionInfo"></div>
+            <div class="transaction-hex" id="transactionHex"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createSignTx } from './dist/symbol-sign-on.mjs';
+
+        // ネットワーク選択の処理
+        document.querySelectorAll('.network-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.network-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                document.getElementById('network').value = card.dataset.network;
+            });
+        });
+
+        // フォーム送信の処理
+        document.getElementById('transactionForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const networkNumber = parseInt(document.getElementById('network').value);
+            const message = '\0' + document.getElementById('message').value;
+
+            if (!message.trim()) {
+                showError('メッセージを入力してください。');
+                return;
+            }
+
+            try {
+                // 転送トランザクション生成
+                const transaction = createSignTx(networkNumber, message);
+
+                // 結果を表示
+                showResult(transaction, networkNumber, message);
+
+                showSuccess('転送トランザクションが正常に生成されました！');
+
+            } catch (error) {
+                console.error('Transaction generation error:', error);
+                showError('転送トランザクション生成中にエラーが発生しました: ' + error.message);
+            }
+        });
+
+        // 結果クリアボタンの処理
+        document.getElementById('clearResult').addEventListener('click', () => {
+            document.getElementById('result').style.display = 'none';
+            clearMessages();
+        });
+
+        function showResult(transaction, networkNumber, message) {
+            const resultDiv = document.getElementById('result');
+            const transactionInfo = document.getElementById('transactionInfo');
+            const transactionHex = document.getElementById('transactionHex');
+
+            // 転送トランザクション情報を表示
+            const networkName = networkNumber === 104 ? 'Mainnet' : 'Testnet';
+            const transactionSize = transaction.length / 2;
+            const messageBytes = new TextEncoder().encode(message).length;
+
+            transactionInfo.innerHTML = `
+                <p><strong>ネットワーク:</strong> ${networkName} (${networkNumber})</p>
+                <p><strong>メッセージ:</strong> "${message}"</p>
+                <p><strong>メッセージサイズ:</strong> ${messageBytes} バイト</p>
+                <p><strong>転送トランザクションサイズ:</strong> ${transactionSize} バイト</p>
+                <p><strong>転送トランザクションタイプ:</strong> Transfer (16724)</p>
+                <p><strong>受信者アドレス:</strong> 982F0A4E106CBC9224DF7AC5E2C6A9D5252E70CB6568B79A</p>
+            `;
+
+            // 16進数転送トランザクションを整形して表示
+            const formattedHex = formatHexString(transaction);
+            transactionHex.textContent = formattedHex;
+
+            resultDiv.style.display = 'block';
+        }
+
+        function formatHexString(hex) {
+            // 16進数文字列をそのまま返す
+            return hex;
+        }
+
+        function showError(message) {
+            clearMessages();
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            document.querySelector('.container').appendChild(errorDiv);
+        }
+
+        function showSuccess(message) {
+            clearMessages();
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = message;
+            document.querySelector('.container').appendChild(successDiv);
+        }
+
+        function clearMessages() {
+            const messages = document.querySelectorAll('.error, .success');
+            messages.forEach(msg => msg.remove());
+        }
+
+        // ページロード時のテスト
+        window.addEventListener('load', () => {
+            try {
+                // 関数が正常にインポートできるかテスト
+                if (typeof createSignTx === 'function') {
+                    console.log('✅ createSingTx function successfully imported');
+
+                    // 簡単なテスト実行
+                    const testTx = createSignTx(152, 'test');
+                    console.log('✅ Test transaction generated:', testTx.substring(0, 50) + '...');
+                } else {
+                    throw new Error('createSingTx function not found');
+                }
+            } catch (error) {
+                console.error('❌ Import test failed:', error);
+                showError('ライブラリの読み込みに失敗しました: ' + error.message);
+            }
+        });
+    </script>
+</body>
+
+</html>

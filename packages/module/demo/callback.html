@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth2 Callback - 認証完了</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        .container {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .success {
+            color: #ffffff;
+            /* 白色に変更 */
+            background-color: #2e7d32;
+            border: 1px solid #1b5e20;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .error {
+            color: #ffcccc;
+            /* 明るい赤色に変更 */
+            background-color: #b71c1c;
+            border: 1px solid #7f0000;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .data-display {
+            background-color: #212121;
+            border: 1px solid #424242;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        .data-item {
+            margin: 10px 0;
+            padding: 8px;
+            border-left: 3px solid #2196f3;
+            background-color: #1e1e1e;
+        }
+
+        .data-label {
+            font-weight: bold;
+            color: #90caf9;
+            display: inline-block;
+            min-width: 120px;
+        }
+
+        .data-value {
+            color: #e0e0e0;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        .token-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #263238;
+            border-radius: 4px;
+        }
+
+        .btn {
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #1976d2;
+        }
+
+        .btn:disabled {
+            background-color: #424242;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 4px solid #424242;
+            border-top: 4px solid #2196f3;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>OAuth2 認証コールバック</h1>
+
+        <div id="status"></div>
+
+        <div class="data-display">
+            <h3>受信データ</h3>
+            <div id="callback-data"></div>
+        </div>
+
+        <div class="token-section">
+            <h3>トークン取得</h3>
+            <button id="get-token-btn" class="btn">認可コードでトークンを取得</button>
+            <div class="loading" id="token-loading">
+                <div class="spinner"></div>
+                <p>トークン取得中...</p>
+            </div>
+            <div id="token-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // URLパラメータを解析
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const result = {};
+            for (const [key, value] of params) {
+                result[key] = value;
+            }
+            return result;
+        }
+
+        // データ表示関数
+        function displayData(label, value, container) {
+            const item = document.createElement('div');
+            item.className = 'data-item';
+            item.innerHTML = `
+                <span class="data-label">${label}:</span>
+                <div class="data-value">${value || '(なし)'}</div>
+            `;
+            container.appendChild(item);
+        }
+
+        // ページロード時の処理
+        window.addEventListener('DOMContentLoaded', function () {
+            const params = getUrlParams();
+            const statusDiv = document.getElementById('status');
+            const dataDiv = document.getElementById('callback-data');
+
+            // エラーチェック
+            if (params.error) {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        <strong>認証エラー:</strong> ${params.error}<br>
+                        ${params.error_description ? `詳細: ${params.error_description}` : ''}
+                    </div>
+                `;
+                return;
+            }
+
+            // 成功時のデータ表示
+            if (params.code) {
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        <strong>認証成功!</strong> 認可コードを受信しました。
+                    </div>
+                `;
+
+                // 受信したデータを表示
+                displayData('認可コード', params.code, dataDiv);
+                displayData('State', params.state, dataDiv);
+
+                // セッションストレージに保存（トークン取得で使用）
+                sessionStorage.setItem('auth_code', params.code);
+                sessionStorage.setItem('state', params.state || '');
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="error">
+                        <strong>エラー:</strong> 認可コードが見つかりません。
+                    </div>
+                `;
+            }
+
+            // その他のパラメータも表示
+            const otherParams = Object.keys(params).filter(key => !['code', 'state', 'error', 'error_description'].includes(key));
+            otherParams.forEach(key => {
+                displayData(key, params[key], dataDiv);
+            });
+        });
+
+        // トークン取得ボタンの処理
+        document.getElementById('get-token-btn').addEventListener('click', async function () {
+            const btn = this;
+            const loading = document.getElementById('token-loading');
+            const result = document.getElementById('token-result');
+
+            //URLからcodeを取得
+            const code = sessionStorage.getItem('auth_code');
+            console.log('取得した認可コード:', code);
+
+            btn.disabled = true;
+            loading.style.display = 'block';
+            result.innerHTML = '';
+
+            try {
+                const authCode = sessionStorage.getItem('auth_code');
+                if (!authCode) {
+                    throw new Error('認可コードが見つかりません');
+                }
+
+                // PKCEパラメータ（実際の実装ではチャレンジ生成時に保存したものを使用）
+                const codeVerifier = sessionStorage.getItem('code_verifier') || 'demo-code-verifier';
+
+                // トークンエンドポイントにリクエスト
+                const response = await fetch('http://localhost:3510/oauth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        grant_type: 'authorization_code',
+                        code: code,
+                        client_id: 'demo-app',
+                        code_verifier: codeVerifier
+                    })
+                });
+
+                const tokenData = await response.json();
+
+                if (response.ok) {
+                    result.innerHTML = `
+                        <div class="success">
+                            <strong>トークン取得成功!</strong>
+                        </div>
+                        <div class="data-display">
+                            <div class="data-item">
+                                <span class="data-label">Access Token:</span>
+                                <div class="data-value">${tokenData.access_token}</div>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">Token Type:</span>
+                                <div class="data-value">${tokenData.token_type}</div>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">Expires In:</span>
+                                <div class="data-value">${tokenData.expires_in} 秒</div>
+                            </div>
+                            ${tokenData.refresh_token ? `
+                            <div class="data-item">
+                                <span class="data-label">Refresh Token:</span>
+                                <div class="data-value">${tokenData.refresh_token}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+
+                    // アクセストークンを保存
+                    sessionStorage.setItem('access_token', tokenData.access_token);
+                } else {
+                    throw new Error(tokenData.error_description || tokenData.error || '不明なエラー');
+                }
+
+            } catch (error) {
+                result.innerHTML = `
+                    <div class="error">
+                        <strong>トークン取得エラー:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>

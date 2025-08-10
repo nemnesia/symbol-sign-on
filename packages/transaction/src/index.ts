@@ -1,18 +1,10 @@
 import { base32ToHexAddress, publicKeyToAddress } from './address'
 
 export const createSingTx = (networkNumber: number, message: string) => {
-  const size = (() => {
-    const len = 160 + message.length
-    const buf = new Uint8Array(4)
-    buf[0] = len & 0xff
-    buf[1] = (len >> 8) & 0xff
-    buf[2] = (len >> 16) & 0xff
-    buf[3] = (len >> 24) & 0xff
-    return Array.from(buf)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase()
-  })()
+  const len = 160 + message.length
+  const sizeHex = len.toString(16).padStart(8, '0').toUpperCase()
+  const size = sizeHex.match(/.{2}/g)?.reverse().join('') || ''
+
   const verifiableEntityHeaderReserved_1 = '00000000'
   const signature =
     '00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
@@ -28,20 +20,18 @@ export const createSingTx = (networkNumber: number, message: string) => {
   const recipientAddress = base32ToHexAddress(
     publicKeyToAddress(networkNumber, signerPublicKey),
   )
-  const messageSize = (() => {
-    const len = message.length
-    const buf = new Uint8Array(2)
-    buf[0] = len & 0xff
-    buf[1] = (len >> 8) & 0xff
-    return Array.from(buf)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase()
-  })()
+
   const mosaicsCount = '00'
   const transferTransactionBodyReserved_1 = '00'
   const transferTransactionBodyReserved_2 = '00000000'
-  const messageHex = Array.from(new TextEncoder().encode(message), (byte) =>
+
+  const encodedMessage = new TextEncoder().encode(message)
+  const messageSizeHex = encodedMessage.length
+    .toString(16)
+    .padStart(4, '0')
+    .toUpperCase()
+  const messageSize = messageSizeHex.match(/.{2}/g)?.reverse().join('') || ''
+  const messageHex = Array.from(encodedMessage, (byte) =>
     byte.toString(16).padStart(2, '0'),
   )
     .join('')

@@ -119,12 +119,26 @@ export async function closeConnection(): Promise<void> {
 }
 
 /**
+ * URLからオリジンを抽出
+ * @param url URL文字列
+ * @returns オリジン文字列またはnull（無効なURLの場合）
+ */
+function extractOrigin(url: string): string | null {
+  try {
+    return new URL(url).origin
+  } catch {
+    return null
+  }
+}
+
+/**
  * 全クライアントのtrusted_redirect_urisを集めてCORS許可オリジンとして返す
  */
 export async function getAllowedOriginsFromMongo(): Promise<string[]> {
   if (!Clients) return []
   const clients = await Clients.find({}).toArray()
-  // trusted_redirect_urisからオリジン部分だけ抽出し、重複除去
+
+  // trusted_redirect_uriからオリジン部分だけ抽出し、重複除去
   const origins = clients
     .flatMap((c) => {
       const uris =
@@ -133,16 +147,10 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
           : Array.isArray(c.trusted_redirect_uri)
             ? c.trusted_redirect_uri
             : []
-      return uris.map((url) => {
-        try {
-          const u = new URL(url)
-          return u.origin
-        } catch {
-          return null
-        }
-      })
+      return uris.map((url) => extractOrigin(url))
     })
-    .filter((o): o is string => !!o)
+    .filter((o): o is string => !!o) // nullを除外
+
   // 重複除去
   return Array.from(new Set(origins))
 }

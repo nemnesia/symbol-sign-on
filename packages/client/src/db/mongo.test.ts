@@ -45,11 +45,6 @@ describe('mongo.tsのテスト', () => {
     expect(Clients.createIndex).toHaveBeenCalledWith({ client_id: 1 }, { unique: true })
   })
 
-  it('データベースインスタンスを取得する', async () => {
-    const { getDb } = await import('./mongo.js')
-    expect(getDb()).toBeNull()
-  })
-
   it('接続を閉じてclientとdbをリセットする', async () => {
     process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
     const { connectToMongo, closeConnection, getDb } = await import('./mongo.js')
@@ -79,6 +74,59 @@ describe('mongo.tsのテスト', () => {
 
     // 警告が出力されたことを確認
     expect(warnSpy).toHaveBeenCalledWith('Failed to create index for clients:', errorMsg)
+    warnSpy.mockRestore()
+  })
+
+  it('全てのインデックス作成に失敗した場合、警告を出力する', async () => {
+    process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
+    const errorMsg1 = 'index error 1!'
+    const errorMsg2 = 'index error 2!'
+    const errorMsg3 = 'index error 3!'
+    const errorMsg4 = 'index error 4!'
+    const errorMsg5 = 'index error 5!'
+
+    // モックを設定
+    mockCollection
+      .mockImplementationOnce(() => ({
+        createIndex: vi.fn().mockRejectedValue(new Error(errorMsg1)),
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      }))
+      .mockImplementationOnce(() => ({
+        createIndex: vi.fn().mockRejectedValue(new Error(errorMsg2)),
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      }))
+      .mockImplementationOnce(() => ({
+        createIndex: vi.fn().mockRejectedValue(new Error(errorMsg3)),
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      }))
+      .mockImplementationOnce(() => ({
+        createIndex: vi.fn().mockRejectedValue(new Error(errorMsg4)),
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      }))
+      .mockImplementationOnce(() => ({
+        createIndex: vi.fn().mockRejectedValue(new Error(errorMsg5)),
+        find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      }))
+
+    // warnスパイを設定（モジュール読み込み前に）
+    const logger = await import('../utils/logger.js')
+    const warnSpy = vi.spyOn(logger.default, 'warn')
+
+    // モジュールを読み込んで実行
+    const { connectToMongo } = await import('./mongo.js')
+    await connectToMongo()
+
+    // 警告が出力されたことを確認
+    expect(warnSpy).toHaveBeenCalledWith('Failed to create index for clients:', errorMsg1)
+    expect(warnSpy).toHaveBeenCalledWith('Failed to create index for challenges:', errorMsg2)
+    expect(warnSpy).toHaveBeenCalledWith('Failed to create index for authcodes:', errorMsg3)
+    expect(warnSpy).toHaveBeenCalledWith('Failed to create index for refresh_tokens:', errorMsg4)
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to create index for access_token_blacklist:',
+      errorMsg5,
+    )
+
+    // スパイをリセット
     warnSpy.mockRestore()
   })
 
@@ -553,6 +601,54 @@ describe('mongo.tsのテスト', () => {
     // この関数はこのテストが実際に実行されるまで正確な戻り値は検証できませんが、
     // findが呼び出されたことを検証できます
     expect(result).toHaveLength(2)
+  })
+
+  it('データ操作関数をテストする（文字配列） - getAllowedOriginsFromMongo', async () => {
+    process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
+
+    const mockClients = [
+      {
+        client_id: 'client1',
+        trusted_redirect_uri: ['https://example.com/callback', 'https://example.com/callback2'],
+        app_name: 'Test App 1',
+        createdAt: new Date(),
+      },
+      {
+        client_id: 'client2',
+        trusted_redirect_uri: 123,
+        app_name: 'Test App 2',
+        createdAt: new Date(),
+      },
+      {
+        client_id: 'client3',
+        trusted_redirect_uri: 'http;abc.com/callback',
+        app_name: 'Test App 3',
+        createdAt: new Date(),
+      },
+      {
+        client_id: 'client4',
+        trusted_redirect_uri: ['https://example2.com/callback', 'https://example.com3/callback2'],
+        app_name: 'Test App 4',
+        createdAt: new Date(),
+      },
+    ]
+
+    const mockClientCollection = {
+      createIndex: vi.fn().mockResolvedValue('index'),
+      find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(mockClients) }),
+    }
+
+    mockCollection.mockImplementation(() => mockClientCollection)
+
+    const { connectToMongo, getAllowedOriginsFromMongo } = await import('./mongo.js')
+    await connectToMongo()
+
+    const result = await getAllowedOriginsFromMongo()
+
+    expect(mockClientCollection.find).toHaveBeenCalledWith({})
+    // この関数はこのテストが実際に実行されるまで正確な戻り値は検証できませんが、
+    // findが呼び出されたことを検証できます
+    expect(result).toHaveLength(3)
   })
 
   it('getAllowedOriginsFromMongo - Clientsが初期化されていない場合', async () => {

@@ -36,7 +36,11 @@ describe('handleUserinfo', () => {
     mockReq.headers = { authorization: 'Bearer valid-token' }
     vi.mocked(verifyAndRevokeJWT as any).mockResolvedValue({ sub: 'address', pub: 'publicKey' })
     await handleUserinfo(mockReq as Request, mockRes as Response)
-    expect(mockJson).toHaveBeenCalledWith({ address: 'address', publicKey: 'publicKey', network: 'testnet' })
+    expect(mockJson).toHaveBeenCalledWith({
+      address: 'address',
+      publicKey: 'publicKey',
+      network: 'testnet',
+    })
   })
 
   it('Authorizationヘッダー未指定は401エラー', async () => {

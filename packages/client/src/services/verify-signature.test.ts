@@ -57,7 +57,7 @@ describe('handleVerifySignature', () => {
     client_id: 'test-client',
     redirect_uri: 'https://example.com/callback',
     createdAt: new Date(),
-    expiresAt: new Date(Date.now() + 3600000) // 1時間後
+    expiresAt: new Date(Date.now() + 3600000), // 1時間後
   }
 
   const mockTransaction = {
@@ -91,7 +91,7 @@ describe('handleVerifySignature', () => {
       json: mockJson,
       status: mockStatus,
       send: mockSend,
-      redirect: mockRedirect
+      redirect: mockRedirect,
     }
 
     // モックをリセット
@@ -143,8 +143,8 @@ describe('handleVerifySignature', () => {
         client_id: 'test-client',
         redirect_uri: '', // 空のredirect_uri
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 3600000) // 1時間後
-      }      // モックの設定
+        expiresAt: new Date(Date.now() + 3600000), // 1時間後
+      } // モックの設定
       vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
@@ -194,7 +194,9 @@ describe('handleVerifySignature', () => {
       expect(mockRedirect).toHaveBeenCalled()
       const redirectUrl = mockRedirect.mock.calls[0][1]
       expect(redirectUrl).toContain('state=test-state')
-      expect(logger.debug).toHaveBeenCalledWith('Including state parameter in redirect (value omitted)')
+      expect(logger.debug).toHaveBeenCalledWith(
+        'Including state parameter in redirect (value omitted)',
+      )
     })
   })
 
@@ -217,7 +219,9 @@ describe('handleVerifySignature', () => {
       expect(mockJson).toHaveBeenCalledWith({
         error: 'Failed to verify signature: Invalid transaction signature',
       })
-      expect(logger.error).toHaveBeenCalledWith('Failed to verify signature: Invalid transaction signature')
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to verify signature: Invalid transaction signature',
+      )
     })
 
     it('トランザクションタイプがTRANSFER以外の場合は400エラーを返す', async () => {
@@ -263,7 +267,9 @@ describe('handleVerifySignature', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: expect.stringContaining('Failed to verify signature: Invalid JSON format in transaction message'),
+          error: expect.stringContaining(
+            'Failed to verify signature: Invalid JSON format in transaction message',
+          ),
         }),
       )
     })
@@ -326,7 +332,7 @@ describe('handleVerifySignature', () => {
         client_id: 'test-client',
         redirect_uri: '', // JSONレスポンス用
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 3600000) // 1時間後
+        expiresAt: new Date(Date.now() + 3600000), // 1時間後
       }
 
       vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
@@ -335,7 +341,9 @@ describe('handleVerifySignature', () => {
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
-      expect(logger.error).toHaveBeenCalledWith('Failed to delete challenge from database: Delete failed')
+      expect(logger.error).toHaveBeenCalledWith(
+        'Failed to delete challenge from database: Delete failed',
+      )
       // レスポンスは正常に返される
       expect(mockJson).toHaveBeenCalledWith({
         code: 'test-auth-code-uuid',
@@ -436,7 +444,9 @@ describe('handleVerifySignature', () => {
       expect(mockRedirect).toHaveBeenCalled()
       const redirectUrl = mockRedirect.mock.calls[0][1]
       expect(redirectUrl).not.toContain('state=')
-      expect(logger.debug).not.toHaveBeenCalledWith('Including state parameter in redirect (value omitted)')
+      expect(logger.debug).not.toHaveBeenCalledWith(
+        'Including state parameter in redirect (value omitted)',
+      )
     })
 
     it.skip('pkce_challengeとpkce_challenge_methodが省略可能', async () => {

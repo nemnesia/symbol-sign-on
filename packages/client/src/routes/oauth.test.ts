@@ -17,7 +17,7 @@ vi.mock('../db/mongo.js', () => ({
   findRefreshToken: vi.fn(),
   deleteRefreshToken: vi.fn(),
   insertAccessTokenBlacklist: vi.fn(),
-  findAccessTokenBlacklist: vi.fn()
+  findAccessTokenBlacklist: vi.fn(),
 }))
 vi.mock('../utils/logger.js', () => ({
   default: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
@@ -33,10 +33,11 @@ describe('OAuth2 Routes', () => {
     vi.mocked(Clients.findOne).mockResolvedValue({
       _id: '123',
       name: 'Test Client',
-      trusted_redirect_uris: ['https://example.com']
+      trusted_redirect_uris: ['https://example.com'],
     })
 
-    const res = await request(app).get('/oauth/check')
+    const res = await request(app)
+      .get('/oauth/check')
       .query({ response_type: 'code', client_id: '123', redirect_uri: 'https://example.com' })
     console.log('Response status:', res.statusCode)
     console.log('Response body:', res.body)
@@ -61,7 +62,7 @@ describe('OAuth2 Routes', () => {
 
   it('POST /oauth/verify-signature should respond with 400 when payload is incomplete', async () => {
     const res = await request(app).post('/oauth/verify-signature').send({
-      signature: 'test-signature'
+      signature: 'test-signature',
       // stateは欠落
     })
     expect(res.statusCode).toBe(400)
@@ -75,7 +76,7 @@ describe('OAuth2 Routes', () => {
   it('POST /oauth/token should respond with 400 when grant_type is missing', async () => {
     const res = await request(app).post('/oauth/token').send({
       code: 'test-code',
-      redirect_uri: 'http://localhost/callback'
+      redirect_uri: 'http://localhost/callback',
     })
     expect(res.statusCode).toBe(400)
   })
@@ -83,7 +84,7 @@ describe('OAuth2 Routes', () => {
   it('POST /oauth/token should respond with 400 when code is missing', async () => {
     const res = await request(app).post('/oauth/token').send({
       grant_type: 'authorization_code',
-      redirect_uri: 'http://localhost/callback'
+      redirect_uri: 'http://localhost/callback',
     })
     expect(res.statusCode).toBe(400)
   })
@@ -94,9 +95,7 @@ describe('OAuth2 Routes', () => {
   })
 
   it('GET /oauth/userinfo should respond with 401 when invalid authorization header is provided', async () => {
-    const res = await request(app)
-      .get('/oauth/userinfo')
-      .set('Authorization', 'Invalid token')
+    const res = await request(app).get('/oauth/userinfo').set('Authorization', 'Invalid token')
     expect(res.statusCode).toBe(401)
   })
 
@@ -107,7 +106,7 @@ describe('OAuth2 Routes', () => {
 
   it('POST /oauth/logout should respond with 400 when token is missing', async () => {
     const res = await request(app).post('/oauth/logout').send({
-      token_type_hint: 'access_token'
+      token_type_hint: 'access_token',
     })
     expect(res.statusCode).toBe(400)
   })

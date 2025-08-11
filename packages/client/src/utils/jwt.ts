@@ -27,7 +27,11 @@ const JWT_EXPIRES_IN = parseTimeToSeconds(process.env.JWT_EXPIRES_IN || '1h')
  * @param clientId クライアントID
  * @returns 生成されたJWT
  */
-export function generateJWT(symbolAddress: string, symbolPublicKey: string, clientId: string): string {
+export function generateJWT(
+  symbolAddress: string,
+  symbolPublicKey: string,
+  clientId: string,
+): string {
   const jwtPayload: JWTPayload = {
     sub: symbolAddress, // サブジェクトはSymbolアドレス
     pub: symbolPublicKey, // 公開鍵
@@ -65,7 +69,10 @@ export async function verifyAndRevokeJWT(jwtId: string): Promise<JWTPayload | nu
  * @param jwtId JWT ID（アクセストークン）
  */
 function addBlacklistEntry(jwtId: string): void {
-  const accessTokenBlacklistDocument: Omit<AccessTokenBlacklistDocument, 'createdAt' | 'expiresAt'> = {
+  const accessTokenBlacklistDocument: Omit<
+    AccessTokenBlacklistDocument,
+    'createdAt' | 'expiresAt'
+  > = {
     jwt_id: jwtId,
     revoked_at: new Date(),
   }

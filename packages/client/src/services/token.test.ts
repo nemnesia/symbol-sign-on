@@ -1,6 +1,13 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteRefreshToken, findAuthCode, findRefreshToken, insertAuthCode, insertRefreshToken, updateAuthCode } from '../db/mongo.js'
+import {
+  deleteRefreshToken,
+  findAuthCode,
+  findRefreshToken,
+  insertAuthCode,
+  insertRefreshToken,
+  updateAuthCode,
+} from '../db/mongo.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
 import { handleToken } from './token.js'
@@ -87,7 +94,10 @@ describe('handleToken', () => {
     mockReq.cookies = {}
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(401)
-    expect(mockJson).toHaveBeenCalledWith({ error: 'Unauthorized', error_description: 'Refresh token is missing' })
+    expect(mockJson).toHaveBeenCalledWith({
+      error: 'Unauthorized',
+      error_description: 'Refresh token is missing',
+    })
   })
 
   it.skip('authorization_code: 有効な認可コードでトークン発行', async () => {
@@ -122,7 +132,12 @@ describe('handleToken', () => {
   })
 
   it('authorization_code: 認可コードが不正/使用済みは400エラー', async () => {
-    mockReq.body = { grant_type: 'authorization_code', code: 'invalid', client_id: 'client', code_verifier: 'verifier' }
+    mockReq.body = {
+      grant_type: 'authorization_code',
+      code: 'invalid',
+      client_id: 'client',
+      code_verifier: 'verifier',
+    }
     vi.mocked(findAuthCode).mockResolvedValue(null)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
@@ -172,7 +187,12 @@ describe('handleToken', () => {
   })
 
   it('authorization_code: PKCE検証失敗は400エラー', async () => {
-    mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client', code_verifier: 'wrong' }
+    mockReq.body = {
+      grant_type: 'authorization_code',
+      code: 'valid-code',
+      client_id: 'client',
+      code_verifier: 'wrong',
+    }
     vi.mocked(findAuthCode).mockResolvedValue(mockAuthCodeDoc)
     vi.mocked(insertAuthCode).mockResolvedValue(undefined)
     vi.mocked(insertRefreshToken).mockResolvedValue(undefined)

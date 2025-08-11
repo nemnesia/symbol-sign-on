@@ -1,7 +1,6 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Clients } from '../db/mongo.js'
-import { insertChallenge } from '../db/mongo.js'
+import { Clients, insertChallenge } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
 
@@ -89,7 +88,9 @@ describe('handleAuthorize', () => {
         error_description: "Only 'code' response_type is supported",
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining("/oauth/authorize validation error: Only 'code' response_type is supported"),
+        expect.stringContaining(
+          "/oauth/authorize validation error: Only 'code' response_type is supported",
+        ),
       )
     })
 
@@ -108,7 +109,9 @@ describe('handleAuthorize', () => {
         error_description: 'Parameters must be single values, not arrays',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize validation error: Parameters must be single values, not arrays'),
+        expect.stringContaining(
+          '/oauth/authorize validation error: Parameters must be single values, not arrays',
+        ),
       )
     })
 
@@ -213,7 +216,9 @@ describe('handleAuthorize', () => {
         error_description: 'Client ID is not registered or has no trusted URI',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize client not found or has no trusted URI: client_id=test-client'),
+        expect.stringContaining(
+          '/oauth/authorize client not found or has no trusted URI: client_id=test-client',
+        ),
       )
     })
 
@@ -231,7 +236,9 @@ describe('handleAuthorize', () => {
         error_description: 'Client ID is not registered or has no trusted URI',
       })
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize client not found or has no trusted URI: client_id=test-client'),
+        expect.stringContaining(
+          '/oauth/authorize client not found or has no trusted URI: client_id=test-client',
+        ),
       )
     })
 
@@ -283,7 +290,9 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Database connection failed'))
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('error=Database connection failed'),
+      )
     })
   })
 
@@ -339,7 +348,9 @@ describe('handleAuthorize', () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('/oauth/authorize Database error while inserting challenge'),
       )
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error: Database connection failed'))
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error: Database connection failed'),
+      )
     })
 
     it('データベースエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
@@ -351,7 +362,9 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Database connection failed'))
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('error=Database connection failed'),
+      )
     })
 
     it('チャレンジの有効期限が正しく設定される（定数使用）', async () => {
@@ -419,7 +432,9 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('/oauth/authorize error: Unexpected error'))
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('/oauth/authorize error: Unexpected error'),
+      )
     })
   })
 
@@ -514,7 +529,9 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining("/oauth/authorize validation error: Only 'code' response_type is supported"),
+        expect.stringContaining(
+          "/oauth/authorize validation error: Only 'code' response_type is supported",
+        ),
       )
     })
   })

@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // モック用
 const mockConnect = vi.fn()
@@ -96,7 +96,7 @@ describe('mongo.tsのテスト', () => {
         createIndex: vi.fn().mockResolvedValue('index'),
         find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
       }))
-      .mockImplementationOnce(() => mockChallengesCollection);
+      .mockImplementationOnce(() => mockChallengesCollection)
 
     const { connectToMongo } = await import('./mongo.js')
     await connectToMongo()
@@ -104,11 +104,11 @@ describe('mongo.tsのテスト', () => {
     expect(mockDb().collection).toHaveBeenCalledWith('challenges')
     expect(mockChallengesCollection.createIndex).toHaveBeenCalledWith(
       { challenge: 1 },
-      { unique: true }
+      { unique: true },
     )
     expect(mockChallengesCollection.createIndex).toHaveBeenCalledWith(
       { expiresAt: 1 },
-      { expireAfterSeconds: 0 }
+      { expireAfterSeconds: 0 },
     )
   })
 
@@ -130,7 +130,7 @@ describe('mongo.tsのテスト', () => {
         createIndex: vi.fn().mockResolvedValue('index'),
         find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
       }))
-      .mockImplementationOnce(() => mockAuthCodesCollection);
+      .mockImplementationOnce(() => mockAuthCodesCollection)
 
     const { connectToMongo } = await import('./mongo.js')
     await connectToMongo()
@@ -138,11 +138,11 @@ describe('mongo.tsのテスト', () => {
     expect(mockDb().collection).toHaveBeenCalledWith('authcodes')
     expect(mockAuthCodesCollection.createIndex).toHaveBeenCalledWith(
       { auth_code: 1 },
-      { unique: true }
+      { unique: true },
     )
     expect(mockAuthCodesCollection.createIndex).toHaveBeenCalledWith(
       { expiresAt: 1 },
-      { expireAfterSeconds: 0 }
+      { expireAfterSeconds: 0 },
     )
   })
 
@@ -156,7 +156,7 @@ describe('mongo.tsのテスト', () => {
     }
 
     // connectToMongoは先に呼び出されたとみなす
-    mockCollection.mockImplementation(() => mockChallengesCollection);
+    mockCollection.mockImplementation(() => mockChallengesCollection)
 
     const { connectToMongo, insertChallenge } = await import('./mongo.js')
     await connectToMongo()
@@ -166,20 +166,20 @@ describe('mongo.tsのテスト', () => {
 
     const challengeKey = 'test-challenge'
     const challengeDoc = {
-      challenge: challengeKey,  // challengeプロパティを追加
+      challenge: challengeKey, // challengeプロパティを追加
       client_id: 'client123',
-      redirect_uri: 'https://example.com/callback'
+      redirect_uri: 'https://example.com/callback',
     }
 
     await insertChallenge(challengeKey, challengeDoc)
 
     // 実際の関数呼び出しパラメータを検証（expiresAtは含めない）
-    const insertOneCall = mockChallengesCollection.insertOne.mock.calls[0][0];
-    expect(insertOneCall.challenge).toBe(challengeKey);
-    expect(insertOneCall.client_id).toBe('client123');
-    expect(insertOneCall.redirect_uri).toBe('https://example.com/callback');
-    expect(insertOneCall.createdAt).toEqual(now);
-    expect(insertOneCall.expiresAt instanceof Date).toBe(true);
+    const insertOneCall = mockChallengesCollection.insertOne.mock.calls[0][0]
+    expect(insertOneCall.challenge).toBe(challengeKey)
+    expect(insertOneCall.client_id).toBe('client123')
+    expect(insertOneCall.redirect_uri).toBe('https://example.com/callback')
+    expect(insertOneCall.createdAt).toEqual(now)
+    expect(insertOneCall.expiresAt instanceof Date).toBe(true)
 
     vi.useRealTimers()
   })
@@ -193,7 +193,7 @@ describe('mongo.tsのテスト', () => {
       code_verifier: 'verifier123',
       redirect_uri: 'https://example.com/callback',
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 180000)
+      expiresAt: new Date(Date.now() + 180000),
     }
 
     const mockChallengesCollection = {
@@ -202,7 +202,7 @@ describe('mongo.tsのテスト', () => {
       findOne: vi.fn().mockResolvedValue(mockChallengeDoc),
     }
 
-    mockCollection.mockImplementation(() => mockChallengesCollection);
+    mockCollection.mockImplementation(() => mockChallengesCollection)
 
     const { connectToMongo, findChallenge } = await import('./mongo.js')
     await connectToMongo()
@@ -222,7 +222,7 @@ describe('mongo.tsのテスト', () => {
       deleteOne: vi.fn().mockResolvedValue({ acknowledged: true, deletedCount: 1 }),
     }
 
-    mockCollection.mockImplementation(() => mockChallengesCollection);
+    mockCollection.mockImplementation(() => mockChallengesCollection)
 
     const { connectToMongo, deleteChallenge } = await import('./mongo.js')
     await connectToMongo()
@@ -255,7 +255,7 @@ describe('mongo.tsのテスト', () => {
       insertOne: vi.fn().mockResolvedValue({ acknowledged: true, insertedId: 'id' }),
     }
 
-    mockCollection.mockImplementation(() => mockAuthCodesCollection);
+    mockCollection.mockImplementation(() => mockAuthCodesCollection)
 
     const { connectToMongo, insertAuthCode } = await import('./mongo.js')
     await connectToMongo()
@@ -268,19 +268,19 @@ describe('mongo.tsのテスト', () => {
       auth_code: authCodeValue,
       address: 'NAAAA...',
       publicKey: 'publicKey123',
-      used: false
+      used: false,
     }
 
     await insertAuthCode(authCodeValue, authCodeDoc)
 
     // 実際の関数呼び出しパラメータを検証（expiresAtは含めない）
-    const insertOneCall = mockAuthCodesCollection.insertOne.mock.calls[0][0];
-    expect(insertOneCall.auth_code).toBe(authCodeValue);
-    expect(insertOneCall.address).toBe('NAAAA...');
-    expect(insertOneCall.publicKey).toBe('publicKey123');
-    expect(insertOneCall.used).toBe(false);
-    expect(insertOneCall.createdAt).toEqual(now);
-    expect(insertOneCall.expiresAt instanceof Date).toBe(true);
+    const insertOneCall = mockAuthCodesCollection.insertOne.mock.calls[0][0]
+    expect(insertOneCall.auth_code).toBe(authCodeValue)
+    expect(insertOneCall.address).toBe('NAAAA...')
+    expect(insertOneCall.publicKey).toBe('publicKey123')
+    expect(insertOneCall.used).toBe(false)
+    expect(insertOneCall.createdAt).toEqual(now)
+    expect(insertOneCall.expiresAt instanceof Date).toBe(true)
 
     vi.useRealTimers()
   })
@@ -294,7 +294,7 @@ describe('mongo.tsのテスト', () => {
       publicKey: 'publicKey123',
       used: false,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 300000)
+      expiresAt: new Date(Date.now() + 300000),
     }
 
     const mockAuthCodesCollection = {
@@ -303,7 +303,7 @@ describe('mongo.tsのテスト', () => {
       findOne: vi.fn().mockResolvedValue(mockAuthCodeDoc),
     }
 
-    mockCollection.mockImplementation(() => mockAuthCodesCollection);
+    mockCollection.mockImplementation(() => mockAuthCodesCollection)
 
     const { connectToMongo, findAuthCode } = await import('./mongo.js')
     await connectToMongo()
@@ -320,24 +320,26 @@ describe('mongo.tsのテスト', () => {
     const mockAuthCodesCollection = {
       createIndex: vi.fn().mockResolvedValue('index'),
       find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
-      updateOne: vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 1, modifiedCount: 1 }),
+      updateOne: vi
+        .fn()
+        .mockResolvedValue({ acknowledged: true, matchedCount: 1, modifiedCount: 1 }),
     }
 
-    mockCollection.mockImplementation(() => mockAuthCodesCollection);
+    mockCollection.mockImplementation(() => mockAuthCodesCollection)
 
     const { connectToMongo, updateAuthCode } = await import('./mongo.js')
     await connectToMongo()
 
     const updateFields = {
       used: true,
-      used_at: new Date()
+      used_at: new Date(),
     }
 
     await updateAuthCode('test-auth-code', updateFields)
 
     expect(mockAuthCodesCollection.updateOne).toHaveBeenCalledWith(
       { auth_code: 'test-auth-code' },
-      { $set: updateFields }
+      { $set: updateFields },
     )
   })
 
@@ -347,17 +349,20 @@ describe('mongo.tsのテスト', () => {
     const mockAuthCodesCollection = {
       createIndex: vi.fn().mockResolvedValue('index'),
       find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
-      updateOne: vi.fn().mockResolvedValue({ acknowledged: true, matchedCount: 0, modifiedCount: 0 }),
+      updateOne: vi
+        .fn()
+        .mockResolvedValue({ acknowledged: true, matchedCount: 0, modifiedCount: 0 }),
     }
 
-    mockCollection.mockImplementation(() => mockAuthCodesCollection);
+    mockCollection.mockImplementation(() => mockAuthCodesCollection)
 
     const { connectToMongo, updateAuthCode } = await import('./mongo.js')
     await connectToMongo()
 
     const authCode = 'non-existent-auth-code'
-    await expect(updateAuthCode(authCode, { used: true }))
-      .rejects.toThrow(`AuthCode not found: ${authCode}`)
+    await expect(updateAuthCode(authCode, { used: true })).rejects.toThrow(
+      `AuthCode not found: ${authCode}`,
+    )
   })
 
   it('データ操作関数をテストする - insertRefreshToken', async () => {
@@ -369,7 +374,7 @@ describe('mongo.tsのテスト', () => {
       insertOne: vi.fn().mockResolvedValue({ acknowledged: true, insertedId: 'id' }),
     }
 
-    mockCollection.mockImplementation(() => mockRefreshTokensCollection);
+    mockCollection.mockImplementation(() => mockRefreshTokensCollection)
 
     const { connectToMongo, insertRefreshToken } = await import('./mongo.js')
     await connectToMongo()
@@ -383,7 +388,7 @@ describe('mongo.tsのテスト', () => {
       address: 'NAAAA...',
       publicKey: 'publicKey123',
       used: false,
-      revoked: false
+      revoked: false,
     }
 
     await insertRefreshToken(refreshTokenValue, refreshTokenDoc)
@@ -391,7 +396,7 @@ describe('mongo.tsのテスト', () => {
     expect(mockRefreshTokensCollection.insertOne).toHaveBeenCalledWith({
       ...refreshTokenDoc,
       createdAt: now,
-      expiresAt: new Date(now.getTime() + 2592000000) // デフォルト30日
+      expiresAt: new Date(now.getTime() + 2592000000), // デフォルト30日
     })
 
     vi.useRealTimers()
@@ -407,7 +412,7 @@ describe('mongo.tsのテスト', () => {
       used: false,
       revoked: false,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 2592000000)
+      expiresAt: new Date(Date.now() + 2592000000),
     }
 
     const mockRefreshTokensCollection = {
@@ -416,14 +421,16 @@ describe('mongo.tsのテスト', () => {
       findOne: vi.fn().mockResolvedValue(mockRefreshTokenDoc),
     }
 
-    mockCollection.mockImplementation(() => mockRefreshTokensCollection);
+    mockCollection.mockImplementation(() => mockRefreshTokensCollection)
 
     const { connectToMongo, findRefreshToken } = await import('./mongo.js')
     await connectToMongo()
 
     const result = await findRefreshToken('test-refresh-token')
 
-    expect(mockRefreshTokensCollection.findOne).toHaveBeenCalledWith({ refresh_token: 'test-refresh-token' })
+    expect(mockRefreshTokensCollection.findOne).toHaveBeenCalledWith({
+      refresh_token: 'test-refresh-token',
+    })
     expect(result).toEqual(mockRefreshTokenDoc)
   })
 
@@ -436,14 +443,16 @@ describe('mongo.tsのテスト', () => {
       deleteOne: vi.fn().mockResolvedValue({ acknowledged: true, deletedCount: 1 }),
     }
 
-    mockCollection.mockImplementation(() => mockRefreshTokensCollection);
+    mockCollection.mockImplementation(() => mockRefreshTokensCollection)
 
     const { connectToMongo, deleteRefreshToken } = await import('./mongo.js')
     await connectToMongo()
 
     await deleteRefreshToken('test-refresh-token')
 
-    expect(mockRefreshTokensCollection.deleteOne).toHaveBeenCalledWith({ refresh_token: 'test-refresh-token' })
+    expect(mockRefreshTokensCollection.deleteOne).toHaveBeenCalledWith({
+      refresh_token: 'test-refresh-token',
+    })
   })
 
   it('データ操作関数をテストする - insertAccessTokenBlacklist', async () => {
@@ -455,7 +464,7 @@ describe('mongo.tsのテスト', () => {
       insertOne: vi.fn().mockResolvedValue({ acknowledged: true, insertedId: 'id' }),
     }
 
-    mockCollection.mockImplementation(() => mockAccessTokenBlacklistCollection);
+    mockCollection.mockImplementation(() => mockAccessTokenBlacklistCollection)
 
     const { connectToMongo, insertAccessTokenBlacklist } = await import('./mongo.js')
     await connectToMongo()
@@ -466,17 +475,17 @@ describe('mongo.tsのテスト', () => {
     const jwtId = 'test-jwt-id'
     const blacklistDoc = {
       jwt_id: jwtId,
-      revoked_at: now
+      revoked_at: now,
     }
 
     await insertAccessTokenBlacklist(jwtId, blacklistDoc)
 
     // 実際の関数呼び出しパラメータを検証（expiresAtは含めない）
-    const insertOneCall = mockAccessTokenBlacklistCollection.insertOne.mock.calls[0][0];
-    expect(insertOneCall.jwt_id).toBe(jwtId);
-    expect(insertOneCall.revoked_at).toEqual(now);
-    expect(insertOneCall.createdAt).toEqual(now);
-    expect(insertOneCall.expiresAt instanceof Date).toBe(true);
+    const insertOneCall = mockAccessTokenBlacklistCollection.insertOne.mock.calls[0][0]
+    expect(insertOneCall.jwt_id).toBe(jwtId)
+    expect(insertOneCall.revoked_at).toEqual(now)
+    expect(insertOneCall.createdAt).toEqual(now)
+    expect(insertOneCall.expiresAt instanceof Date).toBe(true)
 
     vi.useRealTimers()
   })
@@ -488,7 +497,7 @@ describe('mongo.tsのテスト', () => {
       jwt_id: 'test-jwt-id',
       revoked_at: new Date(),
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 3600000)
+      expiresAt: new Date(Date.now() + 3600000),
     }
 
     const mockAccessTokenBlacklistCollection = {
@@ -497,14 +506,16 @@ describe('mongo.tsのテスト', () => {
       findOne: vi.fn().mockResolvedValue(mockBlacklistDoc),
     }
 
-    mockCollection.mockImplementation(() => mockAccessTokenBlacklistCollection);
+    mockCollection.mockImplementation(() => mockAccessTokenBlacklistCollection)
 
     const { connectToMongo, findAccessTokenBlacklist } = await import('./mongo.js')
     await connectToMongo()
 
     const result = await findAccessTokenBlacklist('test-jwt-id')
 
-    expect(mockAccessTokenBlacklistCollection.findOne).toHaveBeenCalledWith({ jwt_id: 'test-jwt-id' })
+    expect(mockAccessTokenBlacklistCollection.findOne).toHaveBeenCalledWith({
+      jwt_id: 'test-jwt-id',
+    })
     expect(result).toEqual(mockBlacklistDoc)
   })
 
@@ -516,14 +527,14 @@ describe('mongo.tsのテスト', () => {
         client_id: 'client1',
         trusted_redirect_uri: 'https://example.com/callback',
         app_name: 'Test App 1',
-        createdAt: new Date()
+        createdAt: new Date(),
       },
       {
         client_id: 'client2',
         trusted_redirect_uri: 'https://another-app.com/callback',
         app_name: 'Test App 2',
-        createdAt: new Date()
-      }
+        createdAt: new Date(),
+      },
     ]
 
     const mockClientCollection = {
@@ -531,7 +542,7 @@ describe('mongo.tsのテスト', () => {
       find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue(mockClients) }),
     }
 
-    mockCollection.mockImplementation(() => mockClientCollection);
+    mockCollection.mockImplementation(() => mockClientCollection)
 
     const { connectToMongo, getAllowedOriginsFromMongo } = await import('./mongo.js')
     await connectToMongo()

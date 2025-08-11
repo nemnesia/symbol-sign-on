@@ -223,7 +223,9 @@ function verifySignature(payload: string): SignatureParams {
         try {
           messageJson = JSON.parse(messageText)
         } catch (parseError) {
-          throw new Error(`Invalid JSON format in transaction message: ${(parseError as Error).message}`)
+          throw new Error(
+            `Invalid JSON format in transaction message: ${(parseError as Error).message}`,
+          )
         }
 
         // 必須フィールドの検証

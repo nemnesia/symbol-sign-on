@@ -90,18 +90,24 @@
         code_challenge_method: 'S256',
       };
 
-      // 動的にフォームを作成してPOSTリクエストを送信
-      const form = document.createElement('form');
+      // 動的にフォームを作成してポップアップでPOSTリクエストを送信
+      const width = 600;
+      const height = 520;
+      const left = (window.screen.availWidth - width) / 2;
+      const top = (window.screen.availHeight - height) / 2;
+      console.debug('Popup position - left:', left, 'top:', top);
+      const popup = window.open('', '_blank', `width=${width},height=${height},left=${left},top=${top}`);
+      const form = popup.document.createElement('form');
       form.method = 'POST';
       form.action = 'http://localhost:3510/login.html';
       Object.entries(params).forEach(([key, value]) => {
-        const input = document.createElement('input');
+        const input = popup.document.createElement('input');
         input.type = 'hidden';
         input.name = key;
         input.value = value;
         form.appendChild(input);
       });
-      document.body.appendChild(form);
+      popup.document.body.appendChild(form);
       form.submit();
 
       // // またはGETリクエストを使用する場合

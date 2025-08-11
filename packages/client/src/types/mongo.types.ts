@@ -5,6 +5,7 @@
 export interface ClientDocument {
   client_id: string
   trusted_redirect_uri: string
+  app_name: string
   createdAt: Date
 }
 

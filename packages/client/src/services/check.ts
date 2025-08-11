@@ -1,33 +1,18 @@
-/**
- * チャレンジコード発行エンドポイント
- * OAuth2認可リクエストを受け取り、チャレンジコードを発行する。
- * - 必須パラメータの検証（関数化）
- * - クライアントIDとリダイレクトURIの照合（関数化）
- * - Redisへチャレンジ情報保存
- * - 定数外部化、URL検証強化、レスポンス統一
- */
 import { Request, Response } from 'express'
-import { v4 as uuidv4 } from 'uuid'
-import { Clients, setChallenge } from '../db/mongo.js'
-import { ChallengeDocument } from '../types/mongo.types.js'
+import { Clients } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 
 // 定数定義
-const CHALLENGE_EXPIRES_IN = 300 // 5分
 const SUPPORTED_RESPONSE_TYPES = ['code'] as const
 
 /**
- * /oauth/authorize の処理
- * チャレンジコードリクエストの処理
+ * /oauth/check の検証ハンドラー
+ * クライアントIDとリダイレクトURIの検証を行い、アプリケーション名を返す。
  *
- * リクエスト
- * - response_type: 'code'（固定）
- * - client_id: クライアントID
- * - redirect_uri: リダイレクトURI
- * @param req Expressリクエスト
- * @param res Expressレスポンス
+ * @param req Express Requestオブジェクト
+ * @param res Express Responseオブジェクト
  */
-export async function handleAuthorize(req: Request, res: Response): Promise<void> {
+export async function handleCheck(req: Request, res: Response): Promise<void> {
   try {
     // パラメータ検証
     const validationResult = validateAuthorizeParams(req.query)
@@ -49,48 +34,17 @@ export async function handleAuthorize(req: Request, res: Response): Promise<void
     if (!clientValidation.valid) {
       handleError(
         res,
-        clientValidation.statusCode || 500,
-        clientValidation.errorCode || 'server_error',
-        clientValidation.message || 'Client validation failed',
-        clientValidation.logMessage || 'Unknown client validation error',
+        clientValidation.statusCode!,
+        clientValidation.errorCode!,
+        clientValidation.message!,
+        clientValidation.logMessage!,
       )
       return
     }
 
-    const appName = clientValidation.appName
+    const { valid, appName } = clientValidation
 
-    // チャレンジコード生成（UUID）
-    const challenge = uuidv4()
-
-    try {
-      // Mongoに保存するチャレンジ情報を構築
-      const challengeData: Omit<ChallengeDocument, 'createdAt' | 'expiresAt'> = {
-        challenge: challenge,
-        client_id: client_id,
-        redirect_uri: redirect_uri,
-      }
-
-      // Mongoにチャレンジ情報を保存
-      await setChallenge(challenge, challengeData, CHALLENGE_EXPIRES_IN)
-    } catch (err) {
-      // Mongo保存エラー
-      handleError(
-        res,
-        500,
-        'server_error',
-        'Database error',
-        `/oauth/authorize Database error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}, error=${(err as Error).stack || (err as Error).message}`,
-      )
-      return
-    }
-
-    // OAuth2準拠のJSONレスポンスを返却（PKCE用語統一）
-    res.json({
-      client_id: client_id,
-      redirect_uri: redirect_uri,
-      challenge: challenge,
-      app_name: appName,
-    })
+    res.json({ valid, app_name: appName })
   } catch (err) {
     // 予期しないサーバーエラー
     handleError(
@@ -118,10 +72,16 @@ function handleError(
   errorDescription: string,
   logMessage: string,
 ): void {
+  // 開発者向けの詳細なログを記録
   logger.error(logMessage)
+
+  // ユーザー向けには簡潔なエラーメッセージを返す
+  const userFriendlyMessage =
+    statusCode >= 500 ? 'An unexpected error occurred. Please try again later.' : errorDescription
+
   res.status(statusCode).json({
     error,
-    error_description: errorDescription,
+    error_description: userFriendlyMessage,
   })
 }
 
@@ -213,6 +173,7 @@ function isValidRedirectUri(uri: string): boolean {
     }
 
     // カスタムスキーム（モバイルアプリ等）も許可
+    // TODO: カスタムスキームの検証ロジックを実装
     return true
   } catch {
     return false
@@ -264,12 +225,21 @@ async function validateClient(
 
     return { valid: true, appName: client.app_name || 'Unknown App' }
   } catch (err) {
-    // DB取得エラー
+    // MongoDBエラー
+    let errorMessage = 'Failed to fetch client data'
+    if (err instanceof Error) {
+      if (err.name === 'MongoNetworkError') {
+        errorMessage = 'MongoDB connection error'
+      } else if (err.name === 'MongoNetworkTimeoutError') {
+        errorMessage = 'MongoDB operation timed out'
+      }
+    }
+
     return {
       valid: false,
       statusCode: 500,
       errorCode: 'server_error',
-      message: 'Failed to fetch client data',
+      message: errorMessage,
       logMessage: `/oauth/authorize database error while fetching client: client_id=${clientId}, error=${(err as Error).stack || (err as Error).message}`,
     }
   }

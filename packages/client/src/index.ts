@@ -1,12 +1,13 @@
 import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
-import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
-import healthRoutes from './routes/health.js'
-import oauthRoutes from './routes/oauth.js'
-import logger from './utils/logger.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
+import healthRoutes from './routes/health.js'
+import loginRoutes from './routes/login.js'
+import oauthRoutes from './routes/oauth.js'
+import logger from './utils/logger.js'
 
 // __dirname を ESモジュールで定義
 const __filename = fileURLToPath(import.meta.url)
@@ -103,52 +104,55 @@ app.use(
 // プリフライトリクエストを明示的に処理
 app.options(/.*/, cors())
 
-app.use(express.json({ limit: '1mb' }))
-app.use(express.urlencoded({ extended: true }))
-app.use(express.static('public'))
-
-// POSTリクエストを処理するエンドポイント
-app.post('/login.html', (req, res) => {
-    console.log('Request body:', req.body);
-    logger.info(`POST request to login.html with data:`, req.body);
-
-    const filePath = path.join(__dirname, '../public/login.html');
-
-    // HTMLファイルを読み取り
-    import('fs').then(fs => {
-        fs.readFile(filePath, 'utf8', (err, html) => {
-            if (err) {
-                logger.error(`Error reading file: ${err.message}`);
-                return res.status(404).send('ファイルが見つかりません');
-            }
-
-            // POSTデータをJSONとしてHTMLに埋め込む
-            const postDataScript = `
-                <script>
-                    window.postData = ${JSON.stringify(req.body)};
-                    console.log('POST Data received:', window.postData);
-                </script>
-            `;
-
-            // HTMLの</head>タグの前にスクリプトを挿入
-            const modifiedHtml = html.replace('</head>', `${postDataScript}</head>`);
-
-            res.setHeader('Content-Type', 'text/html');
-            res.send(modifiedHtml);
-        });
-    }).catch(error => {
-        logger.error(`Error importing fs: ${error.message}`);
-        res.status(500).send('Internal server error');
-    });
-});
-
 // ログミドルウェア
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`)
   next()
 })
 
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true }))
+app.use(express.static('public'))
+
+// POSTリクエストを処理するエンドポイント
+app.post('/login.html', (req, res) => {
+  console.log('Request body:', req.body)
+  logger.info(`POST request to login.html with data:`, req.body)
+
+  const filePath = path.join(__dirname, '../public/login.html')
+
+  // HTMLファイルを読み取り
+  import('fs')
+    .then((fs) => {
+      fs.readFile(filePath, 'utf8', (err, html) => {
+        if (err) {
+          logger.error(`Error reading file: ${err.message}`)
+          return res.status(404).send('ファイルが見つかりません')
+        }
+
+        // POSTデータをJSONとしてHTMLに埋め込む
+        const postDataScript = `
+                <script>
+                    window.postData = ${JSON.stringify(req.body)};
+                    console.log('POST Data received:', window.postData);
+                </script>
+            `
+
+        // HTMLの</head>タグの前にスクリプトを挿入
+        const modifiedHtml = html.replace('</head>', `${postDataScript}</head>`)
+
+        res.setHeader('Content-Type', 'text/html')
+        res.send(modifiedHtml)
+      })
+    })
+    .catch((error) => {
+      logger.error(`Error importing fs: ${error.message}`)
+      res.status(500).send('Internal server error')
+    })
+})
+
 // ルート設定
+app.use('/login', loginRoutes)
 app.use('/oauth', oauthRoutes)
 app.use('/health', healthRoutes)
 

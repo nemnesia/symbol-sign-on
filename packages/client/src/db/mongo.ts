@@ -63,7 +63,7 @@ export async function connectToMongo(): Promise<void> {
   try {
     await Clients.createIndex({ client_id: 1 }, { unique: true })
   } catch (error) {
-    console.warn('Failed to create index for clients:', (error as Error).message)
+    logger.warn('Failed to create index for clients:', (error as Error).message)
   }
 
   // Challenges コレクションのインデックス作成
@@ -71,7 +71,7 @@ export async function connectToMongo(): Promise<void> {
     await Challenges.createIndex({ challenge: 1 }, { unique: true })
     await Challenges.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
-    console.warn('Failed to create index for challenges:', (error as Error).message)
+    logger.warn('Failed to create index for challenges:', (error as Error).message)
   }
 
   // AuthCodes コレクションのインデックス作成
@@ -79,7 +79,7 @@ export async function connectToMongo(): Promise<void> {
     await AuthCodes.createIndex({ auth_code: 1 }, { unique: true })
     await AuthCodes.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
-    console.warn('Failed to create index for authcodes:', (error as Error).message)
+    logger.warn('Failed to create index for authcodes:', (error as Error).message)
   }
 
   // RefreshTokens コレクションのインデックス作成
@@ -87,7 +87,7 @@ export async function connectToMongo(): Promise<void> {
     await RefreshTokens.createIndex({ refresh_token: 1 }, { unique: true })
     await RefreshTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
-    console.warn('Failed to create index for refresh_tokens:', (error as Error).message)
+    logger.warn('Failed to create index for refresh_tokens:', (error as Error).message)
   }
 
   // AccessTokenBlacklist コレクションのインデックス作成
@@ -95,7 +95,7 @@ export async function connectToMongo(): Promise<void> {
     await AccessTokenBlacklist.createIndex({ jwt_id: 1 }, { unique: true })
     await AccessTokenBlacklist.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
-    console.warn('Failed to create index for access_token_blacklist:', (error as Error).message)
+    logger.warn('Failed to create index for access_token_blacklist:', (error as Error).message)
   }
 }
 
@@ -112,7 +112,7 @@ export function getDb(): Db | null {
 export async function closeConnection(): Promise<void> {
   if (client) {
     await client.close()
-    console.log('Disconnected from MongoDB')
+    logger.info('Disconnected from MongoDB')
     client = null
     db = null
   }

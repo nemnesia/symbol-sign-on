@@ -83,7 +83,7 @@ vi.mock('winston', () => {
 })
 
 // loggerをダイナミックインポートでロード
-describe('logger utility', () => {
+describe('loggerユーティリティ', () => {
   let consoleSpy: any
   let logger: any
 
@@ -100,43 +100,43 @@ describe('logger utility', () => {
     consoleSpy.mockRestore()
   })
 
-  // it('should have logger instance', () => {
-  //   expect(logger).toBeDefined()
-  //   expect(typeof logger.info).toBe('function')
-  //   expect(typeof logger.error).toBe('function')
-  //   expect(typeof logger.warn).toBe('function')
-  //   expect(typeof logger.debug).toBe('function')
-  // })
+  it('loggerインスタンスが存在するべき', () => {
+    expect(logger).toBeDefined()
+    expect(typeof logger.info).toBe('function')
+    expect(typeof logger.error).toBe('function')
+    expect(typeof logger.warn).toBe('function')
+    expect(typeof logger.debug).toBe('function')
+  })
 
-  it('should log info messages', () => {
+  it('infoメッセージをログに記録するべき', () => {
     const testMessage = 'Test info message'
     logger.info(testMessage)
     // ログが呼ばれたことを確認
     expect(logger.info).toBeDefined()
   })
 
-  it('should log error messages', () => {
+  it('errorメッセージをログに記録するべき', () => {
     const testMessage = 'Test error message'
     logger.error(testMessage)
     // ログが呼ばれたことを確認
     expect(logger.error).toBeDefined()
   })
 
-  it('should log warn messages', () => {
+  it('warnメッセージをログに記録するべき', () => {
     const testMessage = 'Test warn message'
     logger.warn(testMessage)
     // ログが呼ばれたことを確認
     expect(logger.warn).toBeDefined()
   })
 
-  it('should log debug messages', () => {
+  it('debugメッセージをログに記録するべき', () => {
     const testMessage = 'Test debug message'
     logger.debug(testMessage)
     // ログが呼ばれたことを確認
     expect(logger.debug).toBeDefined()
   })
 
-  it('should format log messages consistently', () => {
+  it('ログメッセージが一貫したフォーマットであるべき', () => {
     // ログフォーマットのテスト
     const message = 'Formatted message test'
     const metadata = { userId: '123', action: 'test' }
@@ -147,30 +147,30 @@ describe('logger utility', () => {
     expect(logger.info).toBeDefined()
   })
 
-  it('should handle transport events and environment configuration', async () => {
-    // コンソールログをスパイ
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  // it('transportイベントと環境設定を処理するべき', async () => {
+  //   // コンソールログをスパイ
+  //   const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    // モックされたtransportインスタンスを使ってイベントをエミット
-    if (mockTransportInstance) {
-      // newイベントをエミット
-      mockTransportInstance.emit('new', 'test-log-file.log')
+  //   // モックされたtransportインスタンスを使ってイベントをエミット
+  //   if (mockTransportInstance) {
+  //     // newイベントをエミット
+  //     mockTransportInstance.emit('new', 'test-log-file.log')
 
-      // rotateイベントをエミット
-      mockTransportInstance.emit('rotate', 'old-file.log', 'new-file.log')
+  //     // rotateイベントをエミット
+  //     mockTransportInstance.emit('rotate', 'old-file.log', 'new-file.log')
 
-      // コンソールログが呼ばれたことを確認
-      expect(consoleSpy).toHaveBeenCalledWith('New log file created: test-log-file.log')
-      expect(consoleSpy).toHaveBeenCalledWith('Log rotated from old-file.log to new-file.log')
-    }
+  //     // コンソールログが呼ばれたことを確認
+  //     expect(consoleSpy).toHaveBeenCalledWith('New log file created: test-log-file.log')
+  //     expect(consoleSpy).toHaveBeenCalledWith('Log rotated from old-file.log to new-file.log')
+  //   }
 
-    // ログレベルとファイルシステムテストの基本動作を確認
-    expect(logger).toBeDefined()
+  //   // ログレベルとファイルシステムテストの基本動作を確認
+  //   expect(logger).toBeDefined()
 
-    consoleSpy.mockRestore()
-  })
+  //   consoleSpy.mockRestore()
+  // })
 
-  it('should log messages with metadata', () => {
+  it('メタデータ付きのメッセージをログに記録するべき', () => {
     const message = 'Test message with metadata'
     const metadata = {
       userId: '123',
@@ -191,7 +191,7 @@ describe('logger utility', () => {
     expect(logger.debug).toBeDefined()
   })
 
-  it('should log messages without metadata', () => {
+  it('メタデータなしのメッセージをログに記録するべき', () => {
     const message = 'Test message without metadata'
 
     // メタデータなしでログをテスト
@@ -207,7 +207,7 @@ describe('logger utility', () => {
     expect(logger.debug).toBeDefined()
   })
 
-  it('should handle error objects in logging', () => {
+  it('エラーオブジェクトを含むログを処理するべき', () => {
     const errorMessage = 'Test error with stack trace'
     const error = new Error(errorMessage)
 
@@ -218,7 +218,7 @@ describe('logger utility', () => {
     expect(logger.error).toBeDefined()
   })
 
-  it('should handle different metadata types', () => {
+  it('異なる型のメタデータを処理するべき', () => {
     // 様々な型のメタデータをテスト
     const testCases = [
       { string: 'test' },
@@ -236,7 +236,7 @@ describe('logger utility', () => {
     expect(logger.info).toBeDefined()
   })
 
-  it('should use environment variables for logger config', async () => {
+  it('環境変数を使用してloggerを設定するべき', async () => {
     vi.resetModules()
     process.env.LOG_DIR = 'custom_logs'
     process.env.LOG_RETENTION_DAYS = '7'
@@ -250,5 +250,36 @@ describe('logger utility', () => {
     expect(process.env.LOG_LEVEL).toBe('debug')
     expect(process.env.LOG_FILE_LEVEL).toBe('warn')
     expect(process.env.LOG_CONSOLE_LEVEL).toBe('error')
+  })
+
+  it('新しいログファイル作成時に正しいメッセージを記録するべき', () => {
+    const mockInfo = vi.spyOn(logger, 'info')
+    const filename = 'test-log-file.log'
+
+    // mockTransportInstanceを使用してイベントをトリガー
+    if (mockTransportInstance) {
+      mockTransportInstance.emit('new', filename)
+    }
+
+    // logger.info が正しく呼び出されたか確認
+    expect(mockInfo).toHaveBeenCalledWith(`New log file created: ${filename}`)
+
+    mockInfo.mockRestore()
+  })
+
+  it('ログローテーション時に正しいメッセージを記録するべき', () => {
+    const mockInfo = vi.spyOn(logger, 'info')
+    const oldFilename = 'old-file.log'
+    const newFilename = 'new-file.log'
+
+    // mockTransportInstanceを使用してイベントをトリガー
+    if (mockTransportInstance) {
+      mockTransportInstance.emit('rotate', oldFilename, newFilename)
+    }
+
+    // logger.info が正しく呼び出されたか確認
+    expect(mockInfo).toHaveBeenCalledWith(`Log rotated from ${oldFilename} to ${newFilename}`)
+
+    mockInfo.mockRestore()
   })
 })

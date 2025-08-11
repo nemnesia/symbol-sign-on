@@ -34,12 +34,12 @@ const transport = new DailyRotateFile({
 
 // ファイル作成時のイベントハンドラ
 transport.on('new', (filename) => {
-  console.log(`New log file created: ${filename}`)
+  logger.info(`New log file created: ${filename}`)
 })
 
 // ローテーション時のイベントハンドラ
 transport.on('rotate', (oldFilename, newFilename) => {
-  console.log(`Log rotated from ${oldFilename} to ${newFilename}`)
+  logger.info(`Log rotated from ${oldFilename} to ${newFilename}`)
 })
 
 const logger = winston.createLogger({

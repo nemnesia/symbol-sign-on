@@ -1,7 +1,6 @@
 import express from 'express'
 import request from 'supertest'
 import { describe, expect, it, vi } from 'vitest'
-import { Clients } from '../db/mongo.js'
 import oauthRouter from './oauth.js'
 
 // モック設定
@@ -28,28 +27,6 @@ app.use(express.json())
 app.use('/oauth', oauthRouter)
 
 describe('OAuth2 Routes', () => {
-  it('GET /oauth/check should respond with status and environment info', async () => {
-    // モックの設定
-    vi.mocked(Clients.findOne).mockResolvedValue({
-      _id: '123',
-      name: 'Test Client',
-      trusted_redirect_uris: ['https://example.com'],
-    })
-
-    const res = await request(app)
-      .get('/oauth/check')
-      .query({ response_type: 'code', client_id: '123', redirect_uri: 'https://example.com' })
-    console.log('Response status:', res.statusCode)
-    console.log('Response body:', res.body)
-
-    // 400が期待される状態なので、テスト検証を修正
-    expect(res.statusCode).toBe(400)
-    if (res.body.error) {
-      expect(res.body).toHaveProperty('error')
-      expect(res.body).toHaveProperty('error_description')
-    }
-  })
-
   it('GET /oauth/authorize should respond', async () => {
     const res = await request(app).get('/oauth/authorize')
     expect([200, 400, 401, 302]).toContain(res.statusCode)

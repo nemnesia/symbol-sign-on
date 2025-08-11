@@ -5,7 +5,6 @@
  */
 import { Router } from 'express'
 import { handleAuthorize } from '../services/authorize.js'
-import { handleCheck } from '../services/check.js'
 import { handleLogout } from '../services/logout.js'
 import { handleToken } from '../services/token.js'
 import { handleUserinfo } from '../services/userinfo.js'
@@ -15,8 +14,6 @@ import { handleVerifySignature } from '../services/verify-signature.js'
  * routerインスタンスの作成
  */
 const router = Router()
-
-router.get('/check', handleCheck)
 
 /**
  * OAuth2認可エンドポイント

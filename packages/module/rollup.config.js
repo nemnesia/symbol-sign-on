@@ -1,16 +1,16 @@
-import typescript from "@rollup/plugin-typescript";
-import { nodeResolve } from "@rollup/plugin-node-resolve";
-import commonjs from "@rollup/plugin-commonjs";
-import json from '@rollup/plugin-json';
-import terser from '@rollup/plugin-terser';
-import { visualizer } from 'rollup-plugin-visualizer';
-import nodePolyfills from 'rollup-plugin-polyfill-node';
+import commonjs from '@rollup/plugin-commonjs'
+import json from '@rollup/plugin-json'
+import { nodeResolve } from '@rollup/plugin-node-resolve'
+import terser from '@rollup/plugin-terser'
+import typescript from '@rollup/plugin-typescript'
+import nodePolyfills from 'rollup-plugin-polyfill-node'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default {
-  input: "src/index.ts",
+  input: 'src/index.ts',
   output: {
-    file: "dist/symbol-sign-on.mjs",
-    format: "es",
+    file: 'dist/symbol-sign-on.mjs',
+    format: 'es',
     sourcemap: true,
   },
   plugins: [
@@ -26,14 +26,14 @@ export default {
     json(),
     commonjs({
       // tree shakingのサポートを向上
-      requireReturnsDefault: "auto",
+      requireReturnsDefault: 'auto',
       // side effectsのない変換を強制
       ignoreDynamicRequires: true,
     }),
     typescript({
       // tree shakingを有効にするための設定
-      module: "esnext",
-      target: "es2020", // より互換性のあるターゲットに変更
+      module: 'esnext',
+      target: 'es2020', // より互換性のあるターゲットに変更
       declaration: false, // ビルド時は型定義を生成しない
     }),
     terser({
@@ -83,4 +83,4 @@ export default {
     // より積極的な未使用コード削除
     preset: 'recommended',
   },
-};
+}

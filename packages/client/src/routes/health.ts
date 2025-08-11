@@ -5,11 +5,11 @@ const router = Router()
 
 // Mongo接続確認用のヘルパー関数
 async function checkMongoConnection(): Promise<boolean> {
-  try {
-    const { getDb } = await import('../db/mongo.js')
-    const db = getDb()
-    if (!db) return false
+  const { getDb } = await import('../db/mongo.js')
+  const db = getDb()
+  if (!db) throw new Error('MongoDB connection is not available')
 
+  try {
     await db.admin().ping()
     return true
   } catch {
@@ -36,10 +36,10 @@ router.get('/', async (req, res) => {
     res.status(statusCode).json(healthStatus)
   } catch (error) {
     logger.error(`Health check failed: ${(error as Error).message}`)
-    res.status(503).json({
+    res.status(505).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
-      error: 'Health check failed',
+      error: (error as Error).message || 'Health check failed',
     })
   }
 })

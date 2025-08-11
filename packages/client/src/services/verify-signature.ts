@@ -95,9 +95,9 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     let challengeDoc: ChallengeDocument | null
     try {
       challengeDoc = await findChallenge(signatureParams.challenge)
-    } catch (redisError) {
-      logger.error(`Redis query failed: ${(redisError as Error).message}`)
-      res.status(500).json({ error: 'Redis connection error' })
+    } catch (dbError) {
+      logger.error(`Database query failed: ${(dbError as Error).message}`)
+      res.status(500).json({ error: 'Database connection error' })
       return
     }
 

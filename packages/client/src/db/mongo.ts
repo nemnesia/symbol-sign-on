@@ -127,11 +127,12 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
   // trusted_redirect_urisからオリジン部分だけ抽出し、重複除去
   const origins = clients
     .flatMap((c) => {
-      const uris = typeof c.trusted_redirect_uri === 'string'
-        ? [c.trusted_redirect_uri]
-        : Array.isArray(c.trusted_redirect_uri)
-          ? c.trusted_redirect_uri
-          : [];
+      const uris =
+        typeof c.trusted_redirect_uri === 'string'
+          ? [c.trusted_redirect_uri]
+          : Array.isArray(c.trusted_redirect_uri)
+            ? c.trusted_redirect_uri
+            : []
       return uris.map((url) => {
         try {
           const u = new URL(url)
@@ -139,7 +140,7 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
         } catch {
           return null
         }
-      });
+      })
     })
     .filter((o): o is string => !!o)
   // 重複除去
@@ -238,10 +239,7 @@ export async function updateAuthCode(
 ): Promise<void> {
   ensureMongoConnected()
 
-  const result = await AuthCodes.updateOne(
-    { auth_code: authCode },
-    { $set: updateFields }
-  )
+  const result = await AuthCodes.updateOne({ auth_code: authCode }, { $set: updateFields })
 
   if (result.matchedCount === 0) {
     throw new Error(`AuthCode not found: ${authCode}`)
@@ -327,7 +325,9 @@ export async function insertAccessTokenBlacklist(
  * @param jwtId JWT ID（アクセストークン）
  * @returns ブラックリストに登録されている場合はドキュメント、されていない場合はnull
  */
-export async function findAccessTokenBlacklist(jwtId: string): Promise<AccessTokenBlacklistDocument | null> {
+export async function findAccessTokenBlacklist(
+  jwtId: string,
+): Promise<AccessTokenBlacklistDocument | null> {
   ensureMongoConnected()
   const doc = await AccessTokenBlacklist.findOne({ jwt_id: jwtId })
   return doc || null

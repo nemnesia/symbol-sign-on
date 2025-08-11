@@ -48,10 +48,10 @@ describe('JWTユーティリティ', () => {
 
   it('verifyAndRevokeJWTで無効なJWTはnullを返しブラックリスト追加される', async () => {
     const invalidToken = 'invalid.jwt.token'
-    const setAccessTokenBlacklist = vi.spyOn(mongo, 'setAccessTokenBlacklist')
+    const insertAccessTokenBlacklist = vi.spyOn(mongo, 'insertAccessTokenBlacklist')
     const result = await verifyAndRevokeJWT(invalidToken)
     expect(result).toBeNull()
-    expect(setAccessTokenBlacklist).toHaveBeenCalledWith(
+    expect(insertAccessTokenBlacklist).toHaveBeenCalledWith(
       invalidToken,
       expect.objectContaining({ jwt_id: invalidToken }),
     )

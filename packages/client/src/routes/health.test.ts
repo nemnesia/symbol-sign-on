@@ -15,7 +15,6 @@ describe('Health Check Route', () => {
     expect(res.body).toHaveProperty('version')
     expect(res.body).toHaveProperty('uptime')
     expect(res.body).toHaveProperty('database')
-    expect(res.body).toHaveProperty('redis')
     expect(res.body).toHaveProperty('memory')
     expect(res.body).toHaveProperty('environment')
   })

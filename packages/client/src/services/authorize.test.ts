@@ -11,6 +11,7 @@ vi.mock('../db/mongo.js', () => ({
     findOne: vi.fn(),
   },
   setChallenge: vi.fn(),
+  insertChallenge: vi.fn(),
 }))
 vi.mock('../utils/logger.js', () => ({
   default: {
@@ -319,13 +320,14 @@ describe('handleAuthorize', () => {
         client_id: 'test-client',
         redirect_uri: 'http://localhost:3000/callback',
         challenge: 'test-challenge-uuid',
+        app_name: 'Unknown App',
       })
     })
 
-    it('Redisエラーが発生した場合は500エラーを返す', async () => {
-      const redisError = new Error('Redis connection failed')
-      redisError.stack = 'Error: Redis connection failed\n    at redis client'
-      vi.mocked(insertChallenge).mockRejectedValue(redisError)
+    it('データベースエラーが発生した場合は500エラーを返す', async () => {
+      const dbError = new Error('Database connection failed')
+      dbError.stack = 'Error: Database connection failed\n    at mongo client'
+      vi.mocked(insertChallenge).mockRejectedValue(dbError)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -337,19 +339,19 @@ describe('handleAuthorize', () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('/oauth/authorize Database error while inserting challenge'),
       )
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error: Redis connection failed'))
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Error: Database connection failed'))
     })
 
-    it('Redisエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
-      const redisError = new Error('Redis connection failed')
+    it('データベースエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
+      const dbError = new Error('Database connection failed')
       // スタックトレースを削除
-      delete redisError.stack
-      vi.mocked(insertChallenge).mockRejectedValue(redisError)
+      delete dbError.stack
+      vi.mocked(insertChallenge).mockRejectedValue(dbError)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Redis connection failed'))
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('error=Database connection failed'))
     })
 
     it('チャレンジの有効期限が正しく設定される（定数使用）', async () => {
@@ -442,6 +444,7 @@ describe('handleAuthorize', () => {
         client_id: 'valid-client',
         redirect_uri: 'https://example.com/callback',
         challenge: 'test-challenge-uuid',
+        app_name: 'Unknown App',
       })
       expect(mockRes.status).not.toHaveBeenCalled()
     })
@@ -471,6 +474,7 @@ describe('handleAuthorize', () => {
         client_id: '123',
         redirect_uri: 'http://localhost:3000/callback',
         challenge: 'test-challenge-uuid',
+        app_name: 'Unknown App',
       })
     })
 
@@ -494,6 +498,7 @@ describe('handleAuthorize', () => {
         client_id: 'test-client',
         redirect_uri: 'custom://app/callback',
         challenge: 'test-challenge-uuid',
+        app_name: 'Unknown App',
       })
     })
   })

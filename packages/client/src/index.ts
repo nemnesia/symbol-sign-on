@@ -1,47 +1,41 @@
-import cookieParser from 'cookie-parser'
-import cors from 'cors'
+// 環境変数の読み込み
 import dotenv from 'dotenv'
+dotenv.config()
+
+// 必要なモジュールのインポート
 import express from 'express'
+import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
 import healthRoutes from './routes/health.js'
 import oauthRoutes from './routes/oauth.js'
 import logger from './utils/logger.js'
 
-// 最初に環境変数を読み込む
-dotenv.config()
-
+// 定数の定義
 const app = express()
 const PORT = process.env.PORT || 3000
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5分間のキャッシュ
 
 // 許可されたオリジンのキャッシュ
 let allowedOriginsCache: string[] = []
 let cacheLastUpdated = 0
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5分間のキャッシュ
 
-/**
- * 許可されたオリジンを取得（キャッシュ機能付き）
- */
+// 許可されたオリジンを取得（キャッシュ機能付き）
 async function getCachedAllowedOrigins(): Promise<string[]> {
   const now = Date.now()
 
-  // キャッシュが有効期限内の場合はキャッシュを返す
   if (allowedOriginsCache.length > 0 && now - cacheLastUpdated < CACHE_TTL_MS) {
     return allowedOriginsCache
   }
 
   try {
-    // MongoDBから最新のオリジンを取得
     const mongoOrigins = await getAllowedOriginsFromMongo()
 
-    // CORS_ORIGINが設定されていることを確認
     if (!process.env.CORS_ORIGIN) {
       throw new Error('CORS_ORIGIN environment variable is required')
     }
 
-    // デフォルトオリジンを追加
     const origins = [...mongoOrigins, process.env.CORS_ORIGIN]
-
-    // キャッシュを更新
     allowedOriginsCache = origins
     cacheLastUpdated = now
 
@@ -50,18 +44,15 @@ async function getCachedAllowedOrigins(): Promise<string[]> {
   } catch (error) {
     logger.error(`Failed to update CORS origins cache: ${(error as Error).message}`)
 
-    // CORS_ORIGIN未設定エラーの場合は再スロー（致命的エラー）
     if ((error as Error).message.includes('CORS_ORIGIN environment variable is required')) {
       throw error
     }
 
-    // エラーの場合は既存のキャッシュまたはデフォルトを返す
     if (allowedOriginsCache.length > 0) {
       logger.warn('Using stale CORS origins cache due to DB error')
       return allowedOriginsCache
     }
 
-    // キャッシュもない場合はCORS_ORIGINのみ（設定されている場合）
     if (!process.env.CORS_ORIGIN) {
       throw new Error('CORS_ORIGIN environment variable is required')
     }
@@ -70,7 +61,7 @@ async function getCachedAllowedOrigins(): Promise<string[]> {
   }
 }
 
-// ミドルウェア設定
+// ミドルウェアの設定
 app.use(
   cors({
     origin: async (origin, callback) => {
@@ -95,25 +86,22 @@ app.use(
     credentials: true,
   }),
 )
-// プリフライトリクエストを明示的に処理
 app.options(/.*/, cors())
 
-// ログミドルウェア
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`)
   next()
 })
-
 app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'))
 
-// ルート設定
+// ルートの設定
 app.use('/oauth', oauthRoutes)
 app.use('/health', healthRoutes)
 
-// 404ハンドラー - '*' の代わりに正規表現を使用
+// 404ハンドラー
 app.use(/.*/, (req, res) => {
   const isDevToolsRequest =
     req.originalUrl.includes('/.well-known/') ||
@@ -138,7 +126,6 @@ app.use((err: Error, req: express.Request, res: express.Response) => {
 // サーバー起動
 async function startServer(): Promise<void> {
   try {
-    // 環境変数の必須チェック
     if (!process.env.CORS_ORIGIN) {
       throw new Error('CORS_ORIGIN environment variable is required. Please set it in .env file.')
     }
@@ -146,7 +133,6 @@ async function startServer(): Promise<void> {
     await connectToMongo()
     logger.info('MongoDB connected')
 
-    // CORS許可オリジンのキャッシュを初期化
     await getCachedAllowedOrigins()
     logger.info(`CORS origins cache initialized with base origin: ${process.env.CORS_ORIGIN}`)
 
@@ -170,6 +156,7 @@ async function startServer(): Promise<void> {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason)
 })
+
 // 未処理の例外をキャッチ
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error)
@@ -190,9 +177,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
-/**
- * アプリケーションの起動
- */
+// アプリケーションの起動
 startServer().catch((error) => {
   logger.error(`Failed to start application: ${error.message}`)
   process.exit(1)

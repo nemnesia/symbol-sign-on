@@ -2,8 +2,17 @@
   "name": "sso-module",
   "description": "A module for symbol sign-on",
   "version": "1.0.0",
-  "main": "dist/symbol-sign-on.mjs",
   "type": "module",
+  "main": "dist/node/symbol-sign-on.mjs",
+  "module": "dist/node/symbol-sign-on.mjs",
+  "types": "dist/node/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/node/symbol-sign-on.mjs",
+      "require": "./dist/umd/symbol-sign-on.umd.js",
+      "types": "./dist/node/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "rollup -c",
     "build:cp": "yarn build && cp ./dist/symbol-sign-on.umd.js ../client/public/",
@@ -35,6 +44,7 @@
     "prettier": "^3.6.2",
     "prettier-plugin-organize-imports": "^4.2.0",
     "rollup": "^4.44.2",
+    "rollup-plugin-dts": "^6.2.1",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-visualizer": "^6.0.3",
     "tslib": "^2.8.1",

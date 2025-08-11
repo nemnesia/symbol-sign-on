@@ -4,7 +4,7 @@
  */
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
-import { setAccessTokenBlacklist } from '../db/mongo.js'
+import { insertAccessTokenBlacklist } from '../db/mongo.js'
 import { JWTPayload } from '../types/jwt.types.js'
 import { AccessTokenBlacklistDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
@@ -70,6 +70,6 @@ function addBlacklistEntry(jwtId: string): void {
     revoked_at: new Date(),
   }
   // ブラックリスト登録
-  setAccessTokenBlacklist(jwtId, accessTokenBlacklistDocument)
+  insertAccessTokenBlacklist(jwtId, accessTokenBlacklistDocument)
   logger.info(`JWT ${jwtId} added to blacklist`)
 }

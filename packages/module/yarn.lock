@@ -28,6 +28,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/code-frame@npm:^7.26.2":
+  version: 7.27.1
+  resolution: "@babel/code-frame@npm:7.27.1"
+  dependencies:
+    "@babel/helper-validator-identifier": "npm:^7.27.1"
+    js-tokens: "npm:^4.0.0"
+    picocolors: "npm:^1.1.1"
+  checksum: 10c0/5dd9a18baa5fce4741ba729acc3a3272c49c25cb8736c4b18e113099520e7ef7b545a4096a26d600e4416157e63e87d66db46aa3fbf0a5f2286da2705c12da00
+  languageName: node
+  linkType: hard
+
 "@babel/helper-string-parser@npm:^7.27.1":
   version: 7.27.1
   resolution: "@babel/helper-string-parser@npm:7.27.1"
@@ -2644,6 +2655,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-tokens@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "js-tokens@npm:4.0.0"
+  checksum: 10c0/e248708d377aa058eacf2037b07ded847790e6de892bbad3dac0abba2e759cb9f121b00099a65195616badcb6eca8d14d975cb3e89eb1cfda644756402c8aeed
+  languageName: node
+  linkType: hard
+
 "js-tokens@npm:^9.0.1":
   version: 9.0.1
   resolution: "js-tokens@npm:9.0.1"
@@ -2976,36 +2994,6 @@ __metadata:
   checksum: 10c0/9f2b975e9246351f5e3a40dcfac99fcd0baa31fbfab615fe059fb11e51f10e4803c63de1f384c54d656e4db31d000e4767e9ef076a22e12a641357602e31d57d
   languageName: node
   linkType: hard
-
-"module@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "module@workspace:."
-  dependencies:
-    "@noble/hashes": "npm:^1.8.0"
-    "@rollup/plugin-commonjs": "npm:^28.0.6"
-    "@rollup/plugin-json": "npm:^6.1.0"
-    "@rollup/plugin-node-resolve": "npm:^16.0.1"
-    "@rollup/plugin-terser": "npm:^0.4.4"
-    "@rollup/plugin-typescript": "npm:^12.1.4"
-    "@types/express": "npm:^5"
-    "@typescript-eslint/eslint-plugin": "npm:^8.39.0"
-    "@typescript-eslint/parser": "npm:^8.39.0"
-    "@vitest/coverage-v8": "npm:^3.2.4"
-    "@vitest/ui": "npm:^3.2.4"
-    eslint: "npm:^9.33.0"
-    eslint-config-prettier: "npm:^10.1.3"
-    express: "npm:^5.1.0"
-    jsdom: "npm:^26.1.0"
-    prettier: "npm:^3.6.2"
-    prettier-plugin-organize-imports: "npm:^4.2.0"
-    rollup: "npm:^4.44.2"
-    rollup-plugin-polyfill-node: "npm:^0.13.0"
-    rollup-plugin-visualizer: "npm:^6.0.3"
-    tslib: "npm:^2.8.1"
-    typescript: "npm:^5.9.2"
-    vitest: "npm:^3.2.4"
-  languageName: unknown
-  linkType: soft
 
 "mrmime@npm:^2.0.0":
   version: 2.0.1
@@ -3435,6 +3423,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"rollup-plugin-dts@npm:^6.2.1":
+  version: 6.2.1
+  resolution: "rollup-plugin-dts@npm:6.2.1"
+  dependencies:
+    "@babel/code-frame": "npm:^7.26.2"
+    magic-string: "npm:^0.30.17"
+  peerDependencies:
+    rollup: ^3.29.4 || ^4
+    typescript: ^4.5 || ^5.0
+  dependenciesMeta:
+    "@babel/code-frame":
+      optional: true
+  checksum: 10c0/f21c8726470851a40e6ca68ae580261cee8bc6275775291b9c0fdf93b868ed54f12b11c8c0dddce2c14f5691d6032b6647d094835ab9b6789226efa60e1aa71e
+  languageName: node
+  linkType: hard
+
 "rollup-plugin-polyfill-node@npm:^0.13.0":
   version: 0.13.0
   resolution: "rollup-plugin-polyfill-node@npm:0.13.0"
@@ -3812,6 +3816,37 @@ __metadata:
   checksum: 10c0/09270dc4f30d479e666aee820eacd9e464215cdff53848b443964202bf4051490538e5dd1b42e1a65cf7296916ca17640aebf63dae9812749c7542ee5f288dec
   languageName: node
   linkType: hard
+
+"sso-module@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "sso-module@workspace:."
+  dependencies:
+    "@noble/hashes": "npm:^1.8.0"
+    "@rollup/plugin-commonjs": "npm:^28.0.6"
+    "@rollup/plugin-json": "npm:^6.1.0"
+    "@rollup/plugin-node-resolve": "npm:^16.0.1"
+    "@rollup/plugin-terser": "npm:^0.4.4"
+    "@rollup/plugin-typescript": "npm:^12.1.4"
+    "@types/express": "npm:^5"
+    "@typescript-eslint/eslint-plugin": "npm:^8.39.0"
+    "@typescript-eslint/parser": "npm:^8.39.0"
+    "@vitest/coverage-v8": "npm:^3.2.4"
+    "@vitest/ui": "npm:^3.2.4"
+    eslint: "npm:^9.33.0"
+    eslint-config-prettier: "npm:^10.1.3"
+    express: "npm:^5.1.0"
+    jsdom: "npm:^26.1.0"
+    prettier: "npm:^3.6.2"
+    prettier-plugin-organize-imports: "npm:^4.2.0"
+    rollup: "npm:^4.44.2"
+    rollup-plugin-dts: "npm:^6.2.1"
+    rollup-plugin-polyfill-node: "npm:^0.13.0"
+    rollup-plugin-visualizer: "npm:^6.0.3"
+    tslib: "npm:^2.8.1"
+    typescript: "npm:^5.9.2"
+    vitest: "npm:^3.2.4"
+  languageName: unknown
+  linkType: soft
 
 "ssri@npm:^12.0.0":
   version: 12.0.0

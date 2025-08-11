@@ -2,7 +2,7 @@
  * ログアウトサービス
  */
 import { Request, Response } from 'express'
-import { getRefreshToken, setRefreshToken } from '../db/mongo.js'
+import { findRefreshToken, insertRefreshToken } from '../db/mongo.js'
 import { RefreshTokenDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
@@ -24,7 +24,7 @@ export async function handleLogout(req: Request, res: Response): Promise<void> {
     // リフレッシュトークンの取得
     let refreshTokenDoc: RefreshTokenDocument | null = null
     try {
-      refreshTokenDoc = await getRefreshToken(refresh_token)
+      refreshTokenDoc = await findRefreshToken(refresh_token)
     } catch (dbError) {
       logger.error(`Database query failed: ${(dbError as Error).message}`)
       res.status(500).json({ error: 'Database connection error' })
@@ -53,7 +53,7 @@ export async function handleLogout(req: Request, res: Response): Promise<void> {
         used_at: new Date(),
         revoked: false,
       }
-      await setRefreshToken(refresh_token, updatedRefreshToken)
+      await insertRefreshToken(refresh_token, updatedRefreshToken)
     } catch (dbError) {
       logger.error(`Failed to revoke token: ${(dbError as Error).message}`)
       // トークン無効化失敗は致命的ではないので続行

@@ -10,7 +10,7 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { models, SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { v4 as uuidv4 } from 'uuid'
-import { deleteChallenge, getChallenge, setAuthCode } from '../db/mongo.js'
+import { deleteChallenge, findChallenge, insertAuthCode } from '../db/mongo.js'
 import { AuthCodeDocument, ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
@@ -49,7 +49,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
       const { payload } = req.body
       if (payload) {
         const signatureParams = verifySignature(payload)
-        const challengeDoc = await getChallenge(signatureParams.challenge)
+        const challengeDoc = await findChallenge(signatureParams.challenge)
         if (challengeDoc?.redirect_uri) {
           const redirectUrl = new URL(challengeDoc.redirect_uri)
           const allowedOrigin = `${redirectUrl.protocol}//${redirectUrl.host}`
@@ -94,7 +94,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
     // チャレンジ有効性チェック
     let challengeDoc: ChallengeDocument | null
     try {
-      challengeDoc = await getChallenge(signatureParams.challenge)
+      challengeDoc = await findChallenge(signatureParams.challenge)
     } catch (redisError) {
       logger.error(`Redis query failed: ${(redisError as Error).message}`)
       res.status(500).json({ error: 'Redis connection error' })
@@ -134,7 +134,7 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
         pkce_challenge_method: signatureParams.pkce_challenge_method,
         used: false,
       }
-      await setAuthCode(`oauth:auth_code:${authCode}`, authCodeData, AUTHCODE_EXPIRATION)
+      await insertAuthCode(authCode, authCodeData, AUTHCODE_EXPIRATION)
     } catch (dbError) {
       logger.error(`Failed to store auth code: ${(dbError as Error).message}`)
       res.status(500).json({ error: 'Database connection error' })

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Clients } from '../db/mongo.js'
-import { setChallenge } from '../db/mongo.js'
+import { insertChallenge } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleAuthorize, validateAuthorizeParams } from './authorize.js'
 
@@ -301,11 +301,11 @@ describe('handleAuthorize', () => {
     })
 
     it('正常にチャレンジコードを生成して保存する', async () => {
-      vi.mocked(setChallenge).mockResolvedValue(undefined)
+      vi.mocked(insertChallenge).mockResolvedValue(undefined)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
-      expect(setChallenge).toHaveBeenCalledWith(
+      expect(insertChallenge).toHaveBeenCalledWith(
         'test-challenge-uuid',
         {
           challenge: 'test-challenge-uuid',
@@ -325,7 +325,7 @@ describe('handleAuthorize', () => {
     it('Redisエラーが発生した場合は500エラーを返す', async () => {
       const redisError = new Error('Redis connection failed')
       redisError.stack = 'Error: Redis connection failed\n    at redis client'
-      vi.mocked(setChallenge).mockRejectedValue(redisError)
+      vi.mocked(insertChallenge).mockRejectedValue(redisError)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -344,7 +344,7 @@ describe('handleAuthorize', () => {
       const redisError = new Error('Redis connection failed')
       // スタックトレースを削除
       delete redisError.stack
-      vi.mocked(setChallenge).mockRejectedValue(redisError)
+      vi.mocked(insertChallenge).mockRejectedValue(redisError)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -357,12 +357,12 @@ describe('handleAuthorize', () => {
       vi.useFakeTimers()
       vi.setSystemTime(mockDate)
 
-      vi.mocked(setChallenge).mockResolvedValue(undefined)
+      vi.mocked(insertChallenge).mockResolvedValue(undefined)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       // 定数 CHALLENGE_EXPIRES_IN (300秒) が使用されていることを確認
-      expect(setChallenge).toHaveBeenCalledWith(
+      expect(insertChallenge).toHaveBeenCalledWith(
         'test-challenge-uuid',
         expect.objectContaining({
           challenge: 'test-challenge-uuid',
@@ -434,7 +434,7 @@ describe('handleAuthorize', () => {
         trusted_redirect_uri: ['https://example.com/callback'],
       } as any)
 
-      vi.mocked(setChallenge).mockResolvedValue(undefined)
+      vi.mocked(insertChallenge).mockResolvedValue(undefined)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -460,7 +460,7 @@ describe('handleAuthorize', () => {
         trusted_redirect_uri: ['http://localhost:3000/callback'],
       } as any)
 
-      vi.mocked(setChallenge).mockResolvedValue(undefined)
+      vi.mocked(insertChallenge).mockResolvedValue(undefined)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -486,7 +486,7 @@ describe('handleAuthorize', () => {
         trusted_redirect_uri: ['custom://app/callback'],
       } as any)
 
-      vi.mocked(setChallenge).mockResolvedValue(undefined)
+      vi.mocked(insertChallenge).mockResolvedValue(undefined)
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 

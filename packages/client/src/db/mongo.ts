@@ -152,7 +152,7 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
  * @param value チャレンジドキュメント
  * @param expiresIn 有効期限（秒）
  */
-export async function setChallenge(
+export async function insertChallenge(
   key: string,
   value: Omit<ChallengeDocument, 'createdAt' | 'expiresAt'>,
   expiresIn = CHALLENGE_EXPIRATION,
@@ -176,7 +176,7 @@ export async function setChallenge(
  * @param key チャレンジキー
  * @returns チャレンジドキュメントまたはnull
  */
-export async function getChallenge(key: string): Promise<ChallengeDocument | null> {
+export async function findChallenge(key: string): Promise<ChallengeDocument | null> {
   ensureMongoConnected()
   const doc = await Challenges.findOne({ challenge: key })
   return doc || null
@@ -197,7 +197,7 @@ export async function deleteChallenge(key: string): Promise<void> {
  * @param doc 認可コードドキュメント
  * @param expiresIn 有効期限（秒）
  */
-export async function setAuthCode(
+export async function insertAuthCode(
   authCode: string,
   doc: Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'>,
   expiresIn = AUTHCODE_EXPIRATION,
@@ -221,10 +221,31 @@ export async function setAuthCode(
  * @param authCode 認可コード
  * @returns 認可コードドキュメントまたはnull
  */
-export async function getAuthCode(authCode: string): Promise<AuthCodeDocument | null> {
+export async function findAuthCode(authCode: string): Promise<AuthCodeDocument | null> {
   ensureMongoConnected()
   const doc = await AuthCodes.findOne({ auth_code: authCode })
   return doc || null
+}
+
+/**
+ * 認可コードを更新
+ * @param authCode 認可コード
+ * @param updateFields 更新するフィールド
+ */
+export async function updateAuthCode(
+  authCode: string,
+  updateFields: Partial<Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'>>,
+): Promise<void> {
+  ensureMongoConnected()
+
+  const result = await AuthCodes.updateOne(
+    { auth_code: authCode },
+    { $set: updateFields }
+  )
+
+  if (result.matchedCount === 0) {
+    throw new Error(`AuthCode not found: ${authCode}`)
+  }
 }
 
 /**
@@ -233,7 +254,7 @@ export async function getAuthCode(authCode: string): Promise<AuthCodeDocument | 
  * @param doc トークンドキュメント
  * @param expiresIn 有効期限（秒）
  */
-export async function setRefreshToken(
+export async function insertRefreshToken(
   refreshToken: string,
   doc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'>,
   expiresIn = REFRESH_TOKEN_EXPIRATION,
@@ -258,7 +279,7 @@ export async function setRefreshToken(
  * @param refreshToken リフレッシュトークン
  * @returns トークンドキュメントまたはnull
  */
-export async function getRefreshToken(refreshToken: string): Promise<RefreshTokenDocument | null> {
+export async function findRefreshToken(refreshToken: string): Promise<RefreshTokenDocument | null> {
   ensureMongoConnected()
   const doc = await RefreshTokens.findOne({ refresh_token: refreshToken })
   logger.debug(`Get refresh token: ${refreshToken}, value: ${doc}`)
@@ -281,7 +302,7 @@ export async function deleteRefreshToken(refreshToken: string): Promise<void> {
  * @param doc トークンドキュメント
  * @param expiresIn 有効期限（秒）
  */
-export async function setAccessTokenBlacklist(
+export async function insertAccessTokenBlacklist(
   jwtId: string,
   doc: Omit<AccessTokenBlacklistDocument, 'createdAt' | 'expiresAt'>,
   expiresIn = ACCESS_TOKEN_EXPIRATION,
@@ -306,7 +327,7 @@ export async function setAccessTokenBlacklist(
  * @param jwtId JWT ID（アクセストークン）
  * @returns ブラックリストに登録されている場合はドキュメント、されていない場合はnull
  */
-export async function getAccessTokenBlacklist(jwtId: string): Promise<AccessTokenBlacklistDocument | null> {
+export async function findAccessTokenBlacklist(jwtId: string): Promise<AccessTokenBlacklistDocument | null> {
   ensureMongoConnected()
   const doc = await AccessTokenBlacklist.findOne({ jwt_id: jwtId })
   return doc || null

@@ -8,6 +8,7 @@ import healthRoutes from './routes/health.js'
 import loginRoutes from './routes/login.js'
 import oauthRoutes from './routes/oauth.js'
 import logger from './utils/logger.js'
+import cookieParser from 'cookie-parser'
 
 // __dirname を ESモジュールで定義
 const __filename = fileURLToPath(import.meta.url)
@@ -110,6 +111,7 @@ app.use((req, res, next) => {
   next()
 })
 
+app.use(cookieParser())
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use(express.static('public'))

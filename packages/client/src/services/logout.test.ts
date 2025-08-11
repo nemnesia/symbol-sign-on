@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getRefreshToken, setRefreshToken } from '../db/mongo.js'
+import { findRefreshToken, insertRefreshToken } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleLogout } from './logout.js'
 
@@ -41,11 +41,11 @@ describe('handleLogout', () => {
   })
 
   it('正常にrefresh_tokenを取り消しできる', async () => {
-    vi.mocked(getRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
-    vi.mocked(setRefreshToken).mockResolvedValue(undefined)
+    vi.mocked(findRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
+    vi.mocked(insertRefreshToken).mockResolvedValue(undefined)
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockJson).toHaveBeenCalledWith({ status: 'ok', message: 'refresh token revoked' })
-    expect(setRefreshToken).toHaveBeenCalled()
+    expect(insertRefreshToken).toHaveBeenCalled()
   })
 
   it('refresh_token未指定は400エラー', async () => {
@@ -56,26 +56,26 @@ describe('handleLogout', () => {
   })
 
   it('refresh_tokenが存在しない場合は400エラー', async () => {
-    vi.mocked(getRefreshToken).mockResolvedValue(null)
+    vi.mocked(findRefreshToken).mockResolvedValue(null)
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid refresh_token' })
   })
 
   it('used/revokedなrefresh_tokenは400エラー', async () => {
-    vi.mocked(getRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, used: true })
+    vi.mocked(findRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, used: true })
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Refresh token already used or revoked' })
 
-    vi.mocked(getRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, revoked: true })
+    vi.mocked(findRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, revoked: true })
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Refresh token already used or revoked' })
   })
 
   it('DB取得エラーは500エラー', async () => {
-    vi.mocked(getRefreshToken).mockRejectedValue(new Error('DB error'))
+    vi.mocked(findRefreshToken).mockRejectedValue(new Error('DB error'))
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(500)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Database connection error' })
@@ -83,8 +83,8 @@ describe('handleLogout', () => {
   })
 
   it('DB保存エラーでも正常レスポンス', async () => {
-    vi.mocked(getRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
-    vi.mocked(setRefreshToken).mockRejectedValue(new Error('Save error'))
+    vi.mocked(findRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
+    vi.mocked(insertRefreshToken).mockRejectedValue(new Error('Save error'))
     await handleLogout(mockReq as Request, mockRes as Response)
     expect(mockJson).toHaveBeenCalledWith({ status: 'ok', message: 'refresh token revoked' })
     expect(logger.error).toHaveBeenCalledWith('Failed to revoke token: Save error')

@@ -12,35 +12,76 @@ export type ChallengeRequest = {
 export type ChallengeResponse = {
   client_id: string
   redirect_uri: string
-  challenge: string
-}
-
-/**
- * チャレンジエラーの型定義
- */
-export type ChallengeError = {
-  error: string
+  app_name?: string
+  challenge?: string
+  error?: string
   error_description?: string
 }
 
 /**
+ * アプリクライアントのチェックを行う
+ * @param params チャレンジリクエスト
+ * @param baseUrl サーバベースURL
+ * @returns チェックアプリクライアントレスポンスまたはエラー
+ */
+export const checkAppClient = async (params: ChallengeRequest, baseUrl?: string): Promise<ChallengeResponse> => {
+  const param = new URLSearchParams({
+    response_type: 'code',
+    client_id: params.client_id,
+    redirect_uri: params.redirect_uri,
+  })
+
+  const res = await fetch(`${baseUrl}/oauth/check?${param.toString()}`)
+
+  const data = await res.json()
+  if (data.error) {
+    // エラー
+    return {
+      client_id: data.client_id,
+      redirect_uri: data.redirect_uri,
+      error: data.error,
+      error_description: data.error_description,
+    }
+  }
+
+  return {
+    client_id: params.client_id,
+    redirect_uri: params.redirect_uri,
+    app_name: data.app_name,
+  }
+}
+
+/**
  * チャレンジを取得する
- * @param params パラメータ(client_id, redirect_uri)
+ * @param params チャレンジリクエスト
  * @param baseUrl サーバベースURL
  * @returns チャレンジレスポンスまたはエラー
  */
-export const getChallenge = async (
-  params: ChallengeRequest,
-  baseUrl?: string,
-): Promise<ChallengeResponse | ChallengeError> => {
+export const getChallenge = async (params: ChallengeRequest, baseUrl?: string): Promise<ChallengeResponse> => {
   const urlParams = new URLSearchParams({
     response_type: 'code',
     client_id: params.client_id,
     redirect_uri: params.redirect_uri,
   })
   const res = await fetch(`${baseUrl}/oauth/authorize?${urlParams.toString()}`)
+
   const data = await res.json()
-  return data
+  if (data.error) {
+    // エラー
+    return {
+      client_id: data.client_id,
+      redirect_uri: data.redirect_uri,
+      error: data.error,
+      error_description: data.error_description,
+    }
+  }
+
+  return {
+    client_id: data.client_id,
+    redirect_uri: data.redirect_uri,
+    app_name: data.app_name,
+    challenge: data.challenge,
+  }
 }
 
 /**

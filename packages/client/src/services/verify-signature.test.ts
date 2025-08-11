@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteChallenge, getChallenge, setAuthCode } from '../db/mongo.js'
+import { deleteChallenge, findChallenge, insertAuthCode } from '../db/mongo.js'
 import logger from '../utils/logger.js'
 import { handleVerifySignature } from './verify-signature.js'
 
@@ -147,8 +147,8 @@ describe('handleVerifySignature', () => {
       }
 
       // モックの設定
-      vi.mocked(getChallenge).mockResolvedValue(challengeDocWithoutRedirect)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -157,7 +157,7 @@ describe('handleVerifySignature', () => {
         code: 'test-auth-code-uuid',
         expires_in: 120,
       })
-      expect(setAuthCode).toHaveBeenCalledWith(
+      expect(insertAuthCode).toHaveBeenCalledWith(
         'oauth:auth_code:test-auth-code-uuid',
         {
           auth_code: 'test-auth-code-uuid',
@@ -174,8 +174,8 @@ describe('handleVerifySignature', () => {
 
     it('redirect_uriがある場合はHTMLリダイレクトを返す', async () => {
       // モックの設定
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -188,8 +188,8 @@ describe('handleVerifySignature', () => {
 
     it('stateパラメータを正しくリダイレクトURLに含める', async () => {
       // モックの設定
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -292,7 +292,7 @@ describe('handleVerifySignature', () => {
     })
 
     it('チャレンジが存在しない場合は400エラーを返す', async () => {
-      vi.mocked(getChallenge).mockResolvedValue(null)
+      vi.mocked(findChallenge).mockResolvedValue(null)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -303,7 +303,7 @@ describe('handleVerifySignature', () => {
 
   describe('エラーハンドリング', () => {
     it('Redis取得エラーの場合は500エラーを返す', async () => {
-      vi.mocked(getChallenge).mockRejectedValue(new Error('Redis connection failed'))
+      vi.mocked(findChallenge).mockRejectedValue(new Error('Redis connection failed'))
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -313,8 +313,8 @@ describe('handleVerifySignature', () => {
     })
 
     it('認可コード保存エラーの場合は500エラーを返す', async () => {
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockRejectedValue(new Error('Database save failed'))
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockRejectedValue(new Error('Database save failed'))
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -330,8 +330,8 @@ describe('handleVerifySignature', () => {
         redirect_uri: '', // JSONレスポンス用
       }
 
-      vi.mocked(getChallenge).mockResolvedValue(challengeDocWithoutRedirect)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockRejectedValue(new Error('Delete failed'))
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -349,8 +349,8 @@ describe('handleVerifySignature', () => {
         ...mockChallengeDoc,
         redirect_uri: 'invalid-url',
       }
-      vi.mocked(getChallenge).mockResolvedValue(invalidRedirectDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(invalidRedirectDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -387,8 +387,8 @@ describe('handleVerifySignature', () => {
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
 
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockRejectedValue(new Error('Unexpected error'))
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockRejectedValue(new Error('Unexpected error'))
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -404,8 +404,8 @@ describe('handleVerifySignature', () => {
         ...mockChallengeDoc,
         redirect_uri: 'https://example.com/callback?param=<script>alert("xss")</script>',
       }
-      vi.mocked(getChallenge).mockResolvedValue(xssChallengeDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(xssChallengeDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -432,8 +432,8 @@ describe('handleVerifySignature', () => {
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
@@ -455,12 +455,12 @@ describe('handleVerifySignature', () => {
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
-      vi.mocked(getChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(setAuthCode).mockResolvedValue(undefined)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
+      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
-      expect(setAuthCode).toHaveBeenCalledWith(
+      expect(insertAuthCode).toHaveBeenCalledWith(
         'oauth:auth_code:test-auth-code-uuid',
         expect.objectContaining({
           pkce_challenge: undefined,

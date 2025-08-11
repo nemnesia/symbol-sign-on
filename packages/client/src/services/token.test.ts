@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/mongo.js'
+import { deleteRefreshToken, findAuthCode, findRefreshToken, insertAuthCode, insertRefreshToken } from '../db/mongo.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
 import { handleToken } from './token.js'
@@ -89,9 +89,9 @@ describe('handleToken', () => {
     // PKCEなしのテストケースに変更
     const mockAuthCodeDocNoPKCE = { ...mockAuthCodeDoc, pkce_challenge: undefined, pkce_challenge_method: undefined }
     mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client' }
-    vi.mocked(getAuthCode).mockResolvedValue(mockAuthCodeDocNoPKCE)
-    vi.mocked(setAuthCode).mockResolvedValue(undefined)
-    vi.mocked(setRefreshToken).mockResolvedValue(undefined)
+    vi.mocked(findAuthCode).mockResolvedValue(mockAuthCodeDocNoPKCE)
+    vi.mocked(insertAuthCode).mockResolvedValue(undefined)
+    vi.mocked(insertRefreshToken).mockResolvedValue(undefined)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockJson).toHaveBeenCalledWith({
       access_token: mockJWT,
@@ -102,12 +102,12 @@ describe('handleToken', () => {
 
   it('authorization_code: 認可コードが不正/使用済みは400エラー', async () => {
     mockReq.body = { grant_type: 'authorization_code', code: 'invalid', client_id: 'client', code_verifier: 'verifier' }
-    vi.mocked(getAuthCode).mockResolvedValue(null)
+    vi.mocked(findAuthCode).mockResolvedValue(null)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or used code' })
 
-    vi.mocked(getAuthCode).mockResolvedValue({ ...mockAuthCodeDoc, used: true })
+    vi.mocked(findAuthCode).mockResolvedValue({ ...mockAuthCodeDoc, used: true })
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or used code' })
@@ -115,7 +115,7 @@ describe('handleToken', () => {
 
   it('authorization_code: PKCE code_verifier未指定は400エラー', async () => {
     mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client' }
-    vi.mocked(getAuthCode).mockResolvedValue(mockAuthCodeDoc)
+    vi.mocked(findAuthCode).mockResolvedValue(mockAuthCodeDoc)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({
@@ -131,7 +131,7 @@ describe('handleToken', () => {
       client_id: 'client',
       code_verifier: 'verifier',
     }
-    vi.mocked(getAuthCode).mockResolvedValue({ ...mockAuthCodeDoc, pkce_challenge_method: 'plain' })
+    vi.mocked(findAuthCode).mockResolvedValue({ ...mockAuthCodeDoc, pkce_challenge_method: 'plain' })
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({
@@ -142,9 +142,9 @@ describe('handleToken', () => {
 
   it('authorization_code: PKCE検証失敗は400エラー', async () => {
     mockReq.body = { grant_type: 'authorization_code', code: 'valid-code', client_id: 'client', code_verifier: 'wrong' }
-    vi.mocked(getAuthCode).mockResolvedValue(mockAuthCodeDoc)
-    vi.mocked(setAuthCode).mockResolvedValue(undefined)
-    vi.mocked(setRefreshToken).mockResolvedValue(undefined)
+    vi.mocked(findAuthCode).mockResolvedValue(mockAuthCodeDoc)
+    vi.mocked(insertAuthCode).mockResolvedValue(undefined)
+    vi.mocked(insertRefreshToken).mockResolvedValue(undefined)
     // PKCE S256 challenge計算を失敗させる
     const { calculatePKCEChallenge } = await import('./token.js')
     vi.spyOn({ calculatePKCEChallenge }, 'calculatePKCEChallenge').mockReturnValue('not-match')
@@ -163,7 +163,7 @@ describe('handleToken', () => {
       client_id: 'client',
       code_verifier: 'verifier',
     }
-    vi.mocked(getAuthCode).mockRejectedValue(new Error('DB error'))
+    vi.mocked(findAuthCode).mockRejectedValue(new Error('DB error'))
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(500)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Database connection error' })
@@ -172,9 +172,9 @@ describe('handleToken', () => {
 
   it('refresh_token: 有効なリフレッシュトークンでトークン再発行', async () => {
     mockReq.body = { grant_type: 'refresh_token', refresh_token: 'valid-refresh-token', client_id: 'client' }
-    vi.mocked(getRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
+    vi.mocked(findRefreshToken).mockResolvedValue(mockRefreshTokenDoc)
     vi.mocked(deleteRefreshToken).mockResolvedValue(undefined)
-    vi.mocked(setRefreshToken).mockResolvedValue(undefined)
+    vi.mocked(insertRefreshToken).mockResolvedValue(undefined)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockJson).toHaveBeenCalledWith({
       access_token: mockJWT,
@@ -185,17 +185,17 @@ describe('handleToken', () => {
 
   it('refresh_token: 不正/使用済み/期限切れは400エラー', async () => {
     mockReq.body = { grant_type: 'refresh_token', refresh_token: 'invalid', client_id: 'client' }
-    vi.mocked(getRefreshToken).mockResolvedValue(null)
+    vi.mocked(findRefreshToken).mockResolvedValue(null)
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or used/expired refresh_token' })
 
-    vi.mocked(getRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, used: true })
+    vi.mocked(findRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, used: true })
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or used/expired refresh_token' })
 
-    vi.mocked(getRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, revoked: true })
+    vi.mocked(findRefreshToken).mockResolvedValue({ ...mockRefreshTokenDoc, revoked: true })
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(400)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or used/expired refresh_token' })
@@ -203,7 +203,7 @@ describe('handleToken', () => {
 
   it('refresh_token: DB取得エラーは500エラー', async () => {
     mockReq.body = { grant_type: 'refresh_token', refresh_token: 'valid-refresh-token', client_id: 'client' }
-    vi.mocked(getRefreshToken).mockRejectedValue(new Error('DB error'))
+    vi.mocked(findRefreshToken).mockRejectedValue(new Error('DB error'))
     await handleToken(mockReq as Request, mockRes as Response)
     expect(mockStatus).toHaveBeenCalledWith(500)
     expect(mockJson).toHaveBeenCalledWith({ error: 'Database connection error' })

@@ -9,7 +9,13 @@
 import crypto from 'crypto'
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { deleteRefreshToken, getAuthCode, getRefreshToken, setAuthCode, setRefreshToken } from '../db/mongo.js'
+import {
+  deleteRefreshToken,
+  findAuthCode,
+  findRefreshToken,
+  insertRefreshToken,
+  updateAuthCode,
+} from '../db/mongo.js'
 import { AuthCodeDocument, RefreshTokenDocument } from '../types/mongo.types.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
@@ -28,7 +34,7 @@ const JWT_EXPIRES_IN = parseTimeToSeconds(process.env.JWT_EXPIRES_IN || '1h')
  */
 export async function handleToken(req: Request, res: Response): Promise<void> {
   try {
-    const { grant_type, code, client_id, refresh_token, code_verifier } = req.body
+    const { grant_type, code, client_id, code_verifier } = req.body
 
     // 必須パラメータの検証
     if (!grant_type) {
@@ -45,11 +51,20 @@ export async function handleToken(req: Request, res: Response): Promise<void> {
       await handleAuthorizationCodeGrant(res, code, client_id, code_verifier)
     } else if (grant_type === 'refresh_token') {
       // リフレッシュトークングラントの処理
-      if (!refresh_token || !client_id) {
+      // HTTP Only Cookieからリフレッシュトークンを取得
+      console.log('クッキー:', req.cookies)
+      const refreshToken = req.cookies.refresh_token
+      if (!refreshToken) {
+        res
+          .status(401)
+          .json({ error: 'Unauthorized', error_description: 'Refresh token is missing' })
+        return
+      }
+      if (!refreshToken || !client_id) {
         res.status(400).json({ error: 'Missing refresh_token or client_id' })
         return
       }
-      await handleRefreshTokenGrant(res, refresh_token, client_id)
+      await handleRefreshTokenGrant(res, refreshToken, client_id)
     } else {
       res.status(400).json({ error: 'Unsupported grant_type' })
     }
@@ -75,7 +90,7 @@ async function handleAuthorizationCodeGrant(
   // 認可コードの有効性チェック
   let authCodeDoc: AuthCodeDocument | null = null
   try {
-    authCodeDoc = (await getAuthCode(authCode)) as AuthCodeDocument | null
+    authCodeDoc = (await findAuthCode(authCode)) as AuthCodeDocument | null
   } catch (dbError) {
     logger.error(`Database query failed: ${(dbError as Error).message}`)
     res.status(500).json({ error: 'Database connection error' })
@@ -108,7 +123,9 @@ async function handleAuthorizationCodeGrant(
         logger.debug('PKCE S256 challenge calculated')
       } catch (err) {
         logger.error(`PKCE S256 calculation error: ${err instanceof Error ? err.message : err}`)
-        res.status(500).json({ error: 'server_error', error_description: 'Failed to verify code challenge' })
+        res
+          .status(500)
+          .json({ error: 'server_error', error_description: 'Failed to verify code challenge' })
         return
       }
     } else {
@@ -137,7 +154,7 @@ async function handleAuthorizationCodeGrant(
 
   // 認可コードを使用済みに更新
   try {
-    await setAuthCode(authCode, { ...authCodeDoc, used: true, used_at: new Date() })
+    await updateAuthCode(authCode, { ...authCodeDoc, used: true, used_at: new Date() })
   } catch (dbError) {
     logger.error(`Failed to update auth code: ${(dbError as Error).message}`)
   }
@@ -151,13 +168,18 @@ async function handleAuthorizationCodeGrant(
       used: false,
       revoked: false,
     }
-    await setRefreshToken(refreshToken, refreshTokenDoc)
+    await insertRefreshToken(refreshToken, refreshTokenDoc)
   } catch (dbError) {
     logger.error(`Failed to store refresh token: ${(dbError as Error).message}`)
   }
 
   // トークン発行成功レスポンス
   logger.info(`Token issued for client: ${clientId}`)
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true, // HttpOnly属性を設定
+    secure: process.env.NODE_ENV === 'production', // 本番環境ではSecure属性を設定
+    path: '/', // アプリ全体
+  })
   res.json({
     access_token: accessToken,
     refresh_token: refreshToken,
@@ -171,11 +193,15 @@ async function handleAuthorizationCodeGrant(
  * @param refreshToken リフレッシュトークン
  * @param clientId クライアントID
  */
-async function handleRefreshTokenGrant(res: Response, refreshToken: string, clientId: string): Promise<void> {
+async function handleRefreshTokenGrant(
+  res: Response,
+  refreshToken: string,
+  clientId: string,
+): Promise<void> {
   // リフレッシュトークン有効性チェック
   let refreshTokenDoc: RefreshTokenDocument | null = null
   try {
-    refreshTokenDoc = await getRefreshToken(refreshToken)
+    refreshTokenDoc = await findRefreshToken(refreshToken)
   } catch (dbError) {
     logger.error(`Database query failed: ${(dbError as Error).message}`)
     res.status(500).json({ error: 'Database connection error' })
@@ -208,13 +234,18 @@ async function handleRefreshTokenGrant(res: Response, refreshToken: string, clie
       used: false,
       revoked: false,
     }
-    await setRefreshToken(newRefreshToken, newRefreshTokenDoc)
+    await insertRefreshToken(newRefreshToken, newRefreshTokenDoc)
   } catch (dbError) {
     logger.error(`Failed to store new refresh token: ${(dbError as Error).message}`)
   }
 
   // トークン再発行成功レスポンス
   logger.info(`Token refreshed for client: ${clientId}`)
+  res.cookie('refresh_token', newRefreshToken, {
+    httpOnly: true, // HttpOnly属性を設定
+    secure: process.env.NODE_ENV === 'production', // 本番環境ではSecure属性を設定
+    path: '/', // アプリ全体
+  })
   res.json({
     access_token: accessToken,
     refresh_token: newRefreshToken,

@@ -8,7 +8,7 @@
  */
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { Clients, setChallenge } from '../db/mongo.js'
+import { Clients, insertChallenge } from '../db/mongo.js'
 import { ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
@@ -71,7 +71,7 @@ export async function handleAuthorize(req: Request, res: Response): Promise<void
       }
 
       // Mongoにチャレンジ情報を保存
-      await setChallenge(challenge, challengeData, CHALLENGE_EXPIRES_IN)
+      await insertChallenge(challenge, challengeData, CHALLENGE_EXPIRES_IN)
     } catch (err) {
       // Mongo保存エラー
       handleError(

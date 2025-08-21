@@ -4,7 +4,7 @@ import {
   AuthCodeDocument,
   ChallengeDocument,
   ClientDocument,
-  RefreshTokenDocument,
+  SessionDocument,
 } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
@@ -36,8 +36,8 @@ let db: Db | null = null
 export let Clients: Collection<ClientDocument>
 export let Challenges: Collection<ChallengeDocument>
 export let AuthCodes: Collection<AuthCodeDocument>
-export let RefreshTokens: Collection<RefreshTokenDocument>
 export let AccessTokenBlacklist: Collection<AccessTokenBlacklistDocument>
+export let Sessions: Collection<SessionDocument>
 
 /**
  * MongoDBに接続し、各コレクションを初期化
@@ -56,44 +56,103 @@ export async function connectToMongo(): Promise<void> {
   Clients = db.collection('clients')
   Challenges = db.collection('challenges')
   AuthCodes = db.collection('authcodes')
-  RefreshTokens = db.collection('refresh_tokens')
+  Sessions = db.collection('sessions')
   AccessTokenBlacklist = db.collection('access_token_blacklist')
 
-  // Clients コレクションのインデックス作成
+  /**
+   * クライアントコレクションのインデックス作成
+   * インデックス1
+   * - client_id  クライアントID
+   * - unique     ユニーク制約を付与
+   */
   try {
     await Clients.createIndex({ client_id: 1 }, { unique: true })
   } catch (error) {
     logger.warn('Failed to create index for clients:', (error as Error).message)
   }
 
-  // Challenges コレクションのインデックス作成
+  /**
+   * チャレンジコレクションのインデックス作成
+   * インデックス1
+   * - client_id  クライアントID
+   * - challenge  チャレンジ
+   * - unique     ユニーク制約を付与
+   * インデックス2
+   * - expires_at  有効期限
+   * - expireAfterSeconds  経過時間で自動削除
+   */
   try {
-    await Challenges.createIndex({ challenge: 1 }, { unique: true })
-    await Challenges.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+    await Challenges.createIndex({ client_id: 1, challenge: 1 }, { unique: true })
+    await Challenges.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
     logger.warn('Failed to create index for challenges:', (error as Error).message)
   }
 
-  // AuthCodes コレクションのインデックス作成
+  /**
+   * 認可コードコレクションのインデックス作成
+   * インデックス1
+   * - client_id  クライアントID
+   * - auth_code  認可コード
+   * - unique     ユニーク制約を付与
+   * インデックス2
+   * - expires_at  有効期限
+   * - expireAfterSeconds  経過時間で自動削除
+   */
   try {
-    await AuthCodes.createIndex({ auth_code: 1 }, { unique: true })
-    await AuthCodes.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+    await AuthCodes.createIndex({ client_id: 1, auth_code: 1 }, { unique: true })
+    await AuthCodes.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
     logger.warn('Failed to create index for authcodes:', (error as Error).message)
   }
 
-  // RefreshTokens コレクションのインデックス作成
+  /**
+   * セッションコレクションのインデックス作成
+   * インデックス1
+   * - session_id  セッションID
+   * - unique      ユニーク制約を付与
+   * インデックス2
+   * - client_id   クライアントID
+   * インデックス3
+   * - client_id   クライアントID
+   * - refresh_token リフレッシュトークン
+   * インデックス4
+   * - revoked     無効化フラグ
+   * インデックス5
+   * - expires_at リフレッシュトークン有効期限
+   * - expireAfterSeconds  経過時間で自動削除
+   */
   try {
-    await RefreshTokens.createIndex({ refresh_token: 1 }, { unique: true })
-    await RefreshTokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+    await Sessions.createIndex({ session_id: 1 }, { unique: true })
+    await Sessions.createIndex({ client_id: 1 })
+    await Sessions.createIndex({ client_id: 1, refresh_token: 1 })
+    await Sessions.createIndex({ revoked: 1 })
+    await Sessions.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
-    logger.warn('Failed to create index for refresh_tokens:', (error as Error).message)
+    logger.warn('Failed to create index for sessions:', (error as Error).message)
   }
 
-  // AccessTokenBlacklist コレクションのインデックス作成
+  /**
+   * アクセストークンブラックリストコレクションのインデックス作成
+   * インデックス1
+   * - access_token アクセストークン
+   * - unique      ユニーク制約を付与
+   * インデックス2
+   * - client_id   クライアントID
+   * インデックス3
+   * - client_id   クライアントID
+   * - access_token アクセストークン
+   * インデックス4
+   * - revoked_at  無効化日時
+   * インデックス5
+   * - expires_at  有効期限
+   * - expireAfterSeconds  経過時間で自動削除
+   */
   try {
-    await AccessTokenBlacklist.createIndex({ jwt_id: 1 }, { unique: true })
-    await AccessTokenBlacklist.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+    await AccessTokenBlacklist.createIndex({ access_token: 1 }, { unique: true })
+    await AccessTokenBlacklist.createIndex({ client_id: 1 })
+    await AccessTokenBlacklist.createIndex({ client_id: 1, access_token: 1 })
+    await AccessTokenBlacklist.createIndex({ revoked_at: 1 })
+    await AccessTokenBlacklist.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 })
   } catch (error) {
     logger.warn('Failed to create index for access_token_blacklist:', (error as Error).message)
   }
@@ -156,59 +215,61 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
 }
 
 /**
- * チャレンジをMongoに保存
- * @param key チャレンジキー
- * @param value チャレンジドキュメント
+ * チャレンジドキュメント登録
+ * @param doc チャレンジドキュメント
  * @param expiresIn 有効期限（秒）
  */
 export async function insertChallenge(
-  key: string,
-  value: Omit<ChallengeDocument, 'createdAt' | 'expiresAt'>,
+  doc: Omit<ChallengeDocument, 'created_at' | 'updated_at' | 'expires_at'>,
   expiresIn = CHALLENGE_EXPIRATION,
 ): Promise<void> {
   ensureMongoConnected()
   const now = new Date()
   const expiresAt = new Date(now.getTime() + expiresIn * 1000)
 
-  const doc: ChallengeDocument = {
-    ...value,
-    challenge: key,
-    createdAt: now,
-    expiresAt: expiresAt,
+  const fullDoc: ChallengeDocument = {
+    ...doc,
+    expires_at: expiresAt,
+    created_at: now,
+    updated_at: now,
   }
 
-  await Challenges.insertOne(doc)
+  await Challenges.insertOne(fullDoc)
 }
 
 /**
- * チャレンジをMongoから取得
- * @param key チャレンジキー
+ * チャレンジドキュメント取得
+ * @param clientId クライアントID
+ * @param challenge チャレンジ
  * @returns チャレンジドキュメントまたはnull
  */
-export async function findChallenge(key: string): Promise<ChallengeDocument | null> {
+export async function findChallenge(
+  clientId: string,
+  challenge: string,
+): Promise<ChallengeDocument | null> {
   ensureMongoConnected()
-  const doc = await Challenges.findOne({ challenge: key })
+  const doc = await Challenges.findOne({ client_id: clientId, challenge: challenge })
   return doc || null
 }
 
 /**
- * チャレンジをMongoから削除
- * @param key チャレンジキー
+ * チャレンジドキュメント削除
+ * @param clientId クライアントID
+ * @param challenge チャレンジ
  */
-export async function deleteChallenge(key: string): Promise<void> {
+export async function deleteChallenge(clientId: string, challenge: string): Promise<void> {
   ensureMongoConnected()
-  await Challenges.deleteOne({ challenge: key })
+  await Challenges.deleteOne({ client_id: clientId, challenge: challenge })
 }
 
 /**
- * 認可コードをMongoに保存
+ * 認可コードドキュメント登録
  * @param authCode 認可コード
  * @param doc 認可コードドキュメント
  * @param expiresIn 有効期限（秒）
  */
 export async function insertAuthCode(
-  authCode: string,
-  doc: Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'>,
+  doc: Omit<AuthCodeDocument, 'created_at' | 'updated_at' | 'expires_at'>,
   expiresIn = AUTHCODE_EXPIRATION,
 ): Promise<void> {
   ensureMongoConnected()
@@ -217,37 +278,46 @@ export async function insertAuthCode(
 
   const fullDoc: AuthCodeDocument = {
     ...doc,
-    auth_code: authCode,
-    createdAt: now,
-    expiresAt: expiresAt,
+    expires_at: expiresAt,
+    created_at: now,
+    updated_at: now,
   }
 
   await AuthCodes.insertOne(fullDoc)
 }
 
 /**
- * 認可コードをMongoから取得
+ * 認可コードドキュメント取得
+ * @param clientId クライアントID
  * @param authCode 認可コード
  * @returns 認可コードドキュメントまたはnull
  */
-export async function findAuthCode(authCode: string): Promise<AuthCodeDocument | null> {
+export async function findAuthCode(
+  clientId: string,
+  authCode: string,
+): Promise<AuthCodeDocument | null> {
   ensureMongoConnected()
-  const doc = await AuthCodes.findOne({ auth_code: authCode })
+  const doc = await AuthCodes.findOne({ client_id: clientId, auth_code: authCode })
   return doc || null
 }
 
 /**
- * 認可コードを更新
+ * 認可コードドキュメント更新
+ * @param clientId クライアントID
  * @param authCode 認可コード
  * @param updateFields 更新するフィールド
  */
 export async function updateAuthCode(
+  clientId: string,
   authCode: string,
-  updateFields: Partial<Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'>>,
+  updateFields: Partial<Omit<AuthCodeDocument, 'created_at' | 'updated_at' | 'expires_at'>>,
 ): Promise<void> {
   ensureMongoConnected()
 
-  const result = await AuthCodes.updateOne({ auth_code: authCode }, { $set: updateFields })
+  const result = await AuthCodes.updateOne(
+    { client_id: clientId, auth_code: authCode },
+    { $set: updateFields },
+  )
 
   if (result.matchedCount === 0) {
     throw new Error(`AuthCode not found: ${authCode}`)
@@ -255,62 +325,118 @@ export async function updateAuthCode(
 }
 
 /**
- * リフレッシュトークンをMongoに保存
- * @param refreshToken リフレッシュトークン
- * @param doc トークンドキュメント
+ * セッションドキュメント登録
+ * @param doc セッションドキュメント
  * @param expiresIn 有効期限（秒）
  */
-export async function insertRefreshToken(
-  refreshToken: string,
-  doc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'>,
+export async function insertSession(
+  doc: Omit<SessionDocument, 'created_at' | 'updated_at' | 'expires_at'>,
   expiresIn = REFRESH_TOKEN_EXPIRATION,
 ): Promise<void> {
   ensureMongoConnected()
   const now = new Date()
   const expiresAt = new Date(now.getTime() + expiresIn * 1000)
 
-  const fullDoc: RefreshTokenDocument = {
+  const fullDoc: SessionDocument = {
     ...doc,
-    refresh_token: refreshToken,
-    createdAt: now,
-    expiresAt: expiresAt,
+    expires_at: expiresAt,
+    created_at: now,
+    updated_at: now,
   }
 
-  await RefreshTokens.insertOne(fullDoc)
-  logger.debug(`Refresh token set: ${refreshToken}, expires in ${expiresIn} seconds`)
+  await Sessions.insertOne(fullDoc)
 }
 
 /**
- * リフレッシュトークンをMongoから取得
- * @param refreshToken リフレッシュトークン
- * @returns トークンドキュメントまたはnull
+ * セッションドキュメント取得（セッションIDで検索）
+ * @param sessionId セッションID
+ * @returns セッションドキュメントまたはnull
  */
-export async function findRefreshToken(refreshToken: string): Promise<RefreshTokenDocument | null> {
+export async function findSession(sessionId: string): Promise<SessionDocument | null> {
   ensureMongoConnected()
-  const doc = await RefreshTokens.findOne({ refresh_token: refreshToken })
-  logger.debug(`Get refresh token: ${refreshToken}, value: ${doc}`)
+  const doc = await Sessions.findOne({ session_id: sessionId })
   return doc || null
 }
 
 /**
- * リフレッシュトークンをMongoから削除
- * @param refreshToken リフレッシュトークン
+ * セッションドキュメント取得（クライアントIDで検索）
+ * @param clientId クライアントID
+ * @returns セッションドキュメントまたはnull
  */
-export async function deleteRefreshToken(refreshToken: string): Promise<void> {
+export async function findSessionByClientId(clientId: string): Promise<SessionDocument | null> {
   ensureMongoConnected()
-  await RefreshTokens.deleteOne({ refresh_token: refreshToken })
-  logger.debug(`Refresh token deleted: ${refreshToken}`)
+  const doc = await Sessions.findOne({ client_id: clientId })
+  return doc || null
 }
 
 /**
- * アクセストークンブラックリストをMongoに保存
- * @param jwtId JWT ID（アクセストークン）
+ * セッションドキュメント取得（リフレッシュトークンで検索）
+ * @param refreshToken リフレッシュトークン
+ * @returns セッションドキュメントまたはnull
+ */
+export async function findSessionByRefreshToken(
+  refreshToken: string,
+): Promise<SessionDocument | null> {
+  ensureMongoConnected()
+  const doc = await Sessions.findOne({ refresh_token: refreshToken })
+  return doc || null
+}
+
+/**
+ * セッションドキュメント取得（クライアントIDとリフレッシュトークンで検索）
+ * @param clientId クライアントID
+ * @param refreshToken リフレッシュトークン
+ * @returns セッションドキュメントまたはnull
+ */
+export async function findSessionByClientIdAndRefreshToken(
+  clientId: string,
+  refreshToken: string,
+): Promise<SessionDocument | null> {
+  ensureMongoConnected()
+  const doc = await Sessions.findOne({ client_id: clientId, refresh_token: refreshToken })
+  return doc || null
+}
+
+/**
+ * セッションドキュメント取得（クライアントIDとアクセストークンで検索）
+ * @param clientId クライアントID
+ * @param accessToken アクセストークン
+ * @returns セッションドキュメントまたはnull
+ */
+export async function findSessionByClientIdAndAccessToken(
+  clientId: string,
+  accessToken: string,
+): Promise<SessionDocument | null> {
+  ensureMongoConnected()
+  const doc = await Sessions.findOne({ client_id: clientId, access_token: accessToken })
+  return doc || null
+}
+
+/**
+ * セッションドキュメント更新
+ * @param sessionId セッションID
+ * @param updateFields 更新するフィールド
+ */
+export async function updateSession(
+  sessionId: string,
+  updateFields: Partial<Omit<SessionDocument, 'created_at' | 'updated_at' | 'expires_at'>>,
+): Promise<void> {
+  ensureMongoConnected()
+
+  const result = await Sessions.updateOne({ session_id: sessionId }, { $set: updateFields })
+
+  if (result.matchedCount === 0) {
+    throw new Error(`Session not found: ${sessionId}`)
+  }
+}
+
+/**
+ * アクセストークンブラックリストドキュメント登録
  * @param doc トークンドキュメント
  * @param expiresIn 有効期限（秒）
  */
 export async function insertAccessTokenBlacklist(
-  jwtId: string,
-  doc: Omit<AccessTokenBlacklistDocument, 'createdAt' | 'expiresAt'>,
+  doc: Omit<AccessTokenBlacklistDocument, 'created_at' | 'updated_at' | 'expires_at'>,
   expiresIn = ACCESS_TOKEN_EXPIRATION,
 ): Promise<void> {
   ensureMongoConnected()
@@ -319,25 +445,42 @@ export async function insertAccessTokenBlacklist(
 
   const fullDoc: AccessTokenBlacklistDocument = {
     ...doc,
-    jwt_id: jwtId,
-    createdAt: now,
-    expiresAt: expiresAt,
+    expires_at: expiresAt,
+    created_at: now,
+    updated_at: now,
   }
 
   await AccessTokenBlacklist.insertOne(fullDoc)
-  logger.debug(`Access token blacklist set: ${jwtId}, expires in ${expiresIn} seconds`)
+  logger.debug(
+    `Access token blacklist set: ${(doc as any).access_token}, expires in ${expiresIn} seconds`,
+  )
 }
 
 /**
- * アクセストークンがブラックリストに登録されているかチェック
- * @param jwtId JWT ID（アクセストークン）
- * @returns ブラックリストに登録されている場合はドキュメント、されていない場合はnull
+ * アクセストークンブラックリストドキュメント取得（クライアントIDで検索）
+ * @param clientId クライアントID
+ * @returns アクセストークンブラックリストドキュメントまたはnull
  */
-export async function findAccessTokenBlacklist(
-  jwtId: string,
+export async function findAccessTokenBlacklistByClientId(
+  clientId: string,
 ): Promise<AccessTokenBlacklistDocument | null> {
   ensureMongoConnected()
-  const doc = await AccessTokenBlacklist.findOne({ jwt_id: jwtId })
+  const doc = await AccessTokenBlacklist.findOne({ client_id: clientId })
+  return doc || null
+}
+
+/**
+ * アクセストークンブラックリストドキュメント取得（クライアントIDとアクセストークンで検索）
+ * @param clientId クライアントID
+ * @param accessToken アクセストークン
+ * @returns アクセストークンブラックリストドキュメントまたはnull
+ */
+export async function findAccessTokenBlacklistByClientIdAndAccessToken(
+  clientId: string,
+  accessToken: string,
+): Promise<AccessTokenBlacklistDocument | null> {
+  ensureMongoConnected()
+  const doc = await AccessTokenBlacklist.findOne({ client_id: clientId, access_token: accessToken })
   return doc || null
 }
 

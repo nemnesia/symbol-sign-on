@@ -47,12 +47,23 @@ npm install
 
 ```env
 MONGODB_URI=mongodb://localhost:27017/symbol-oauth
-SYMBOL_NETWORK=TEST_NET
+SYMBOL_NETWORK_TYPE=testnet
+
+# レコード有効期限
+CHALLENGE_EXPIRATION=5m
+AUTHCODE_EXPIRATION=2m
+REFRESH_TOKEN_EXPIRATION=30d
+ACCESS_TOKEN_EXPIRATION=15m
+
+# CORS設定
+CORS_ORIGIN=http://localhost:3000
+CORS_ORIGINS_CACHE_TTL=5m
+
+# ログ設定
 LOG_RETENTION_DAYS=14
 LOG_LEVEL=info
 LOG_DIR=logs
 PORT=3000
-ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 ### 開発サーバー起動
@@ -162,6 +173,29 @@ GET /health
 - 本番環境では、Symbol SDK v3を使用した正しい署名検証を実装してください
 - MongoDB のセキュリティ設定を適切に行ってください
 - HTTPS を使用することを強く推奨します
+
+## 環境変数説明
+
+### 基本設定
+- `CORS_ORIGIN`: 許可するベースオリジン（必須）
+- `CORS_ORIGINS_CACHE_TTL`: CORS許可オリジンのキャッシュ時間（例: `5m`, `1h`, `30s`）
+- `PORT`: サーバーポート（デフォルト: 3000）
+- `MONGODB_URI`: MongoDB接続URI（必須）
+
+### 有効期限設定
+- `CHALLENGE_EXPIRATION`: チャレンジの有効期限（デフォルト: 5m）
+- `AUTHCODE_EXPIRATION`: 認可コードの有効期限（デフォルト: 2m）
+- `ACCESS_TOKEN_EXPIRATION`: アクセストークンの有効期限（デフォルト: 15m）
+- `REFRESH_TOKEN_EXPIRATION`: リフレッシュトークンの有効期限（デフォルト: 30d）
+
+### Symbol設定
+- `SYMBOL_NETWORK_TYPE`: Symbolネットワークタイプ（`testnet` または `mainnet`）
+
+### ログ設定
+- `LOG_LEVEL`: ログレベル（`debug`, `info`, `warn`, `error`）
+- `LOG_FILE_LEVEL`: ファイル出力ログレベル
+- `LOG_CONSOLE_LEVEL`: コンソール出力ログレベル
+- `LOG_RETENTION_DAYS`: ログファイルの保持日数
 
 ## 開発メモ
 

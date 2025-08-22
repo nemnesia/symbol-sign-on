@@ -10,11 +10,12 @@ import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
 import healthRoutes from './routes/health.js'
 import oauthRoutes from './routes/oauth.js'
 import logger from './utils/logger.js'
+import { parseTimeToSeconds } from './utils/time.js'
 
 // 定数の定義
 const app = express()
 const PORT = process.env.PORT || 3000
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5分間のキャッシュ
+const CACHE_TTL_MS = parseTimeToSeconds(process.env.CORS_ORIGINS_CACHE_TTL || '5m') * 1000 // CORS originキャッシュのTTL
 
 // 許可されたオリジンのキャッシュ
 let allowedOriginsCache: string[] = []
@@ -40,6 +41,7 @@ async function getCachedAllowedOrigins(): Promise<string[]> {
     cacheLastUpdated = now
 
     logger.debug(`CORS origins cache updated: ${origins.length} origins`)
+    logger.debug(`CORS origins cache TTL: ${CACHE_TTL_MS}ms (${CACHE_TTL_MS / 1000}s)`)
     return origins
   } catch (error) {
     logger.error(`Failed to update CORS origins cache: ${(error as Error).message}`)
@@ -135,6 +137,7 @@ async function startServer(): Promise<void> {
 
     await getCachedAllowedOrigins()
     logger.info(`CORS origins cache initialized with base origin: ${process.env.CORS_ORIGIN}`)
+    logger.info(`CORS origins cache TTL: ${CACHE_TTL_MS / 1000}s (${process.env.CORS_ORIGINS_CACHE_TTL || '5m'})`)
 
     app.listen(PORT, () => {
       logger.info(`Server running on http://localhost:${PORT}`)

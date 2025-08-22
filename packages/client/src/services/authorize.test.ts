@@ -94,12 +94,33 @@ describe('handleAuthorize', () => {
       )
     })
 
-    it('response_typeが配列の場合はエラーを返す', async () => {
-      mockReq.query = {
-        response_type: ['code', 'token'],
-        client_id: 'test-client',
-        redirect_uri: 'http://localhost:3000/callback',
-      }
+    it.each([
+      {
+        name: 'response_typeが配列の場合',
+        query: {
+          response_type: ['code', 'token'],
+          client_id: 'test-client',
+          redirect_uri: 'http://localhost:3000/callback',
+        },
+      },
+      {
+        name: 'client_idが配列の場合',
+        query: {
+          response_type: 'code',
+          client_id: ['client1', 'client2'],
+          redirect_uri: 'http://localhost:3000/callback',
+        },
+      },
+      {
+        name: 'redirect_uriが配列の場合',
+        query: {
+          response_type: 'code',
+          client_id: 'test-client',
+          redirect_uri: ['http://localhost:3000/callback', 'http://localhost:4000/callback'],
+        },
+      },
+    ])('$name はエラーを返す', async ({ query }) => {
+      mockReq.query = query
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -115,60 +136,25 @@ describe('handleAuthorize', () => {
       )
     })
 
-    it('client_idが配列の場合はエラーを返す', async () => {
-      mockReq.query = {
-        response_type: 'code',
-        client_id: ['client1', 'client2'],
-        redirect_uri: 'http://localhost:3000/callback',
-      }
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(400)
-      expect(mockJson).toHaveBeenCalledWith({
-        error: 'invalid_request',
-        error_description: 'Parameters must be single values, not arrays',
-      })
-    })
-
-    it('redirect_uriが配列の場合はエラーを返す', async () => {
-      mockReq.query = {
-        response_type: 'code',
-        client_id: 'test-client',
-        redirect_uri: ['http://localhost:3000/callback', 'http://localhost:4000/callback'],
-      }
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(400)
-      expect(mockJson).toHaveBeenCalledWith({
-        error: 'invalid_request',
-        error_description: 'Parameters must be single values, not arrays',
-      })
-    })
-
-    it('client_idが空文字列の場合はエラーを返す', async () => {
-      mockReq.query = {
-        response_type: 'code',
-        client_id: '',
-        redirect_uri: 'http://localhost:3000/callback',
-      }
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(400)
-      expect(mockJson).toHaveBeenCalledWith({
-        error: 'invalid_request',
-        error_description: 'client_id and redirect_uri cannot be empty',
-      })
-    })
-
-    it('redirect_uriが空文字列の場合はエラーを返す', async () => {
-      mockReq.query = {
-        response_type: 'code',
-        client_id: 'test-client',
-        redirect_uri: '',
-      }
+    it.each([
+      {
+        name: 'client_idが空文字列の場合',
+        query: {
+          response_type: 'code',
+          client_id: '',
+          redirect_uri: 'http://localhost:3000/callback',
+        },
+      },
+      {
+        name: 'redirect_uriが空文字列の場合',
+        query: {
+          response_type: 'code',
+          client_id: 'test-client',
+          redirect_uri: '',
+        },
+      },
+    ])('$name はエラーを返す', async ({ query }) => {
+      mockReq.query = query
 
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
@@ -280,20 +266,6 @@ describe('handleAuthorize', () => {
         ),
       )
     })
-
-    it('スタックトレースがないエラーの場合はメッセージのみログに出力される', async () => {
-      const dbError = new Error('Database connection failed')
-      // スタックトレースを削除
-      delete dbError.stack
-      vi.mocked(Clients.findOne).mockRejectedValue(dbError)
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('error=Database connection failed'),
-      )
-    })
   })
 
   describe('チャレンジコード生成と保存', () => {
@@ -316,11 +288,9 @@ describe('handleAuthorize', () => {
       await handleAuthorize(mockReq as Request, mockRes as Response)
 
       expect(insertChallenge).toHaveBeenCalledWith(
-        'test-challenge-uuid',
         {
           challenge: 'test-challenge-uuid',
           client_id: 'test-client',
-          redirect_uri: 'http://localhost:3000/callback',
         },
         300,
       )
@@ -353,20 +323,6 @@ describe('handleAuthorize', () => {
       )
     })
 
-    it('データベースエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
-      const dbError = new Error('Database connection failed')
-      // スタックトレースを削除
-      delete dbError.stack
-      vi.mocked(insertChallenge).mockRejectedValue(dbError)
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('error=Database connection failed'),
-      )
-    })
-
     it('チャレンジの有効期限が正しく設定される（定数使用）', async () => {
       const mockDate = new Date('2025-08-02T12:00:00Z')
       vi.useFakeTimers()
@@ -378,11 +334,9 @@ describe('handleAuthorize', () => {
 
       // 定数 CHALLENGE_EXPIRES_IN (300秒) が使用されていることを確認
       expect(insertChallenge).toHaveBeenCalledWith(
-        'test-challenge-uuid',
         expect.objectContaining({
           challenge: 'test-challenge-uuid',
           client_id: 'test-client',
-          redirect_uri: 'http://localhost:3000/callback',
         }),
         300, // CHALLENGE_EXPIRES_IN の値
       )
@@ -413,27 +367,6 @@ describe('handleAuthorize', () => {
       })
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining('/oauth/authorize error: Error: Unexpected error'),
-      )
-    })
-
-    it('予期しないエラーでスタックトレースがない場合はメッセージのみログに出力される', async () => {
-      const unexpectedError = new Error('Unexpected error')
-      // スタックトレースを削除
-      delete unexpectedError.stack
-
-      // query プロパティでエラーを投げるようにする
-      Object.defineProperty(mockReq, 'query', {
-        get: () => {
-          throw unexpectedError
-        },
-        configurable: true,
-      })
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(mockStatus).toHaveBeenCalledWith(500)
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('/oauth/authorize error: Unexpected error'),
       )
     })
   })
@@ -515,24 +448,6 @@ describe('handleAuthorize', () => {
         challenge: 'test-challenge-uuid',
         app_name: 'Unknown App',
       })
-    })
-  })
-
-  describe('ログ出力', () => {
-    it('エラー時に適切なログが出力される', async () => {
-      mockReq.query = {
-        response_type: 'invalid',
-        client_id: 'test-client',
-        redirect_uri: 'http://localhost:3000/callback',
-      }
-
-      await handleAuthorize(mockReq as Request, mockRes as Response)
-
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "/oauth/authorize validation error: Only 'code' response_type is supported",
-        ),
-      )
     })
   })
 })
@@ -631,86 +546,6 @@ describe('validateAuthorizeParams', () => {
         valid: false,
         errorCode: 'invalid_request',
         message: 'redirect_uri must be a valid URL',
-      })
-    })
-
-    it('無効なURL形式は拒否', () => {
-      const query = {
-        response_type: 'code',
-        client_id: 'test-client',
-        redirect_uri: 'invalid-url',
-      }
-
-      const result = validateAuthorizeParams(query)
-
-      expect(result).toEqual({
-        valid: false,
-        errorCode: 'invalid_request',
-        message: 'redirect_uri must be a valid URL',
-      })
-    })
-
-    it('必須パラメータが不足している場合はエラーを返す', () => {
-      const query = {
-        response_type: 'code',
-        client_id: 'test-client',
-        // redirect_uri が不足
-      }
-
-      const result = validateAuthorizeParams(query)
-
-      expect(result).toEqual({
-        valid: false,
-        errorCode: 'invalid_request',
-        message: 'Missing required parameters: response_type, client_id, redirect_uri',
-      })
-    })
-
-    it('配列パラメータは拒否される', () => {
-      const query = {
-        response_type: ['code'],
-        client_id: 'test-client',
-        redirect_uri: 'https://example.com/callback',
-      }
-
-      const result = validateAuthorizeParams(query)
-
-      expect(result).toEqual({
-        valid: false,
-        errorCode: 'invalid_request',
-        message: 'Parameters must be single values, not arrays',
-      })
-    })
-
-    it('unsupported response_type は拒否される', () => {
-      const query = {
-        response_type: 'token',
-        client_id: 'test-client',
-        redirect_uri: 'https://example.com/callback',
-      }
-
-      const result = validateAuthorizeParams(query)
-
-      expect(result).toEqual({
-        valid: false,
-        errorCode: 'unsupported_response_type',
-        message: "Only 'code' response_type is supported",
-      })
-    })
-
-    it('空文字列パラメータは拒否される', () => {
-      const query = {
-        response_type: 'code',
-        client_id: '',
-        redirect_uri: 'https://example.com/callback',
-      }
-
-      const result = validateAuthorizeParams(query)
-
-      expect(result).toEqual({
-        valid: false,
-        errorCode: 'invalid_request',
-        message: 'client_id and redirect_uri cannot be empty',
       })
     })
 

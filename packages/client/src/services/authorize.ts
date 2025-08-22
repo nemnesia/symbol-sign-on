@@ -64,14 +64,13 @@ export async function handleAuthorize(req: Request, res: Response): Promise<void
 
     try {
       // Mongoに保存するチャレンジ情報を構築
-      const challengeData: Omit<ChallengeDocument, 'createdAt' | 'expiresAt'> = {
-        challenge: challenge,
+      const challengeDoc: Omit<ChallengeDocument, 'created_at' | 'updated_at' | 'expires_at'> = {
         client_id: client_id,
-        redirect_uri: redirect_uri,
+        challenge: challenge,
       }
 
       // Mongoにチャレンジ情報を保存
-      await insertChallenge(challenge, challengeData, CHALLENGE_EXPIRES_IN)
+      await insertChallenge(challengeDoc, CHALLENGE_EXPIRES_IN)
     } catch (err) {
       // Mongo保存エラー
       handleError(

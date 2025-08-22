@@ -10,13 +10,13 @@ import crypto from 'crypto'
 import { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  deleteRefreshToken,
   findAuthCode,
-  findRefreshToken,
-  insertRefreshToken,
+  findSessionByRefreshToken,
+  insertSession,
   updateAuthCode,
+  updateSession,
 } from '../db/mongo.js'
-import { AuthCodeDocument, RefreshTokenDocument } from '../types/mongo.types.js'
+import { AuthCodeDocument, SessionDocument } from '../types/mongo.types.js'
 import { generateJWT } from '../utils/jwt.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
@@ -90,7 +90,7 @@ async function handleAuthorizationCodeGrant(
   // 認可コードの有効性チェック
   let authCodeDoc: AuthCodeDocument | null = null
   try {
-    authCodeDoc = (await findAuthCode(authCode)) as AuthCodeDocument | null
+    authCodeDoc = (await findAuthCode(clientId, authCode)) as AuthCodeDocument | null
   } catch (dbError) {
     logger.error(`Database query failed: ${(dbError as Error).message}`)
     res.status(500).json({ error: 'Database connection error' })
@@ -149,28 +149,30 @@ async function handleAuthorizationCodeGrant(
   }
 
   // JWT・リフレッシュトークン発行
-  const accessToken = generateJWT(authCodeDoc.address!, authCodeDoc.publicKey!, clientId)
+  const accessToken = generateJWT(authCodeDoc.symbol_address!, authCodeDoc.symbol_public_key!, clientId)
   const refreshToken = uuidv4()
 
   // 認可コードを使用済みに更新
   try {
-    await updateAuthCode(authCode, { ...authCodeDoc, used: true, used_at: new Date() })
+    await updateAuthCode(clientId, authCode, { used: true, used_at: new Date() })
   } catch (dbError) {
     logger.error(`Failed to update auth code: ${(dbError as Error).message}`)
   }
 
-  // リフレッシュトークン保存
+  // セッション作成
   try {
-    const refreshTokenDoc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
+    const sessionDoc: Omit<SessionDocument, 'created_at' | 'updated_at' | 'expires_at'> = {
+      session_id: uuidv4(),
+      client_id: clientId,
       refresh_token: refreshToken,
-      address: authCodeDoc.address,
-      publicKey: authCodeDoc.publicKey,
-      used: false,
+      access_token: accessToken,
+      symbol_address: authCodeDoc.symbol_address,
+      symbol_public_key: authCodeDoc.symbol_public_key,
       revoked: false,
     }
-    await insertRefreshToken(refreshToken, refreshTokenDoc)
+    await insertSession(sessionDoc)
   } catch (dbError) {
-    logger.error(`Failed to store refresh token: ${(dbError as Error).message}`)
+    logger.error(`Failed to store session: ${(dbError as Error).message}`)
   }
 
   // トークン発行成功レスポンス
@@ -198,45 +200,47 @@ async function handleRefreshTokenGrant(
   refreshToken: string,
   clientId: string,
 ): Promise<void> {
-  // リフレッシュトークン有効性チェック
-  let refreshTokenDoc: RefreshTokenDocument | null = null
+  // セッション有効性チェック
+  let sessionDoc: SessionDocument | null = null
   try {
-    refreshTokenDoc = await findRefreshToken(refreshToken)
+    sessionDoc = await findSessionByRefreshToken(refreshToken)
   } catch (dbError) {
     logger.error(`Database query failed: ${(dbError as Error).message}`)
     res.status(500).json({ error: 'Database connection error' })
     return
   }
 
-  if (!refreshTokenDoc || refreshTokenDoc.used || refreshTokenDoc.revoked === true) {
-    logger.warn(`Invalid or used/expired refresh_token: token=${refreshToken}`)
-    res.status(400).json({ error: 'Invalid or used/expired refresh_token' })
+  if (!sessionDoc || sessionDoc.revoked === true) {
+    logger.warn(`Invalid or revoked session: token=${refreshToken}`)
+    res.status(400).json({ error: 'Invalid or revoked session' })
     return
   }
 
   // JWT・新しいリフレッシュトークン発行
-  const accessToken = generateJWT(refreshTokenDoc.address!, refreshTokenDoc.publicKey!, clientId)
+  const accessToken = generateJWT(sessionDoc.symbol_address!, sessionDoc.symbol_public_key!, clientId)
   const newRefreshToken = uuidv4()
 
-  // 古いリフレッシュトークン削除
+  // 古いセッション無効化
   try {
-    await deleteRefreshToken(refreshToken)
+    await updateSession(sessionDoc.session_id, { revoked: true, revoked_at: new Date() })
   } catch (dbError) {
-    logger.error(`Failed to delete old token: ${(dbError as Error).message}`)
+    logger.error(`Failed to revoke old session: ${(dbError as Error).message}`)
   }
 
-  // 新しいリフレッシュトークン保存
+  // 新しいセッション作成
   try {
-    const newRefreshTokenDoc: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
+    const newSessionDoc: Omit<SessionDocument, 'created_at' | 'updated_at' | 'expires_at'> = {
+      session_id: uuidv4(),
+      client_id: clientId,
       refresh_token: newRefreshToken,
-      address: refreshTokenDoc.address,
-      publicKey: refreshTokenDoc.publicKey,
-      used: false,
+      access_token: accessToken,
+      symbol_address: sessionDoc.symbol_address,
+      symbol_public_key: sessionDoc.symbol_public_key,
       revoked: false,
     }
-    await insertRefreshToken(newRefreshToken, newRefreshTokenDoc)
+    await insertSession(newSessionDoc)
   } catch (dbError) {
-    logger.error(`Failed to store new refresh token: ${(dbError as Error).message}`)
+    logger.error(`Failed to store new session: ${(dbError as Error).message}`)
   }
 
   // トークン再発行成功レスポンス

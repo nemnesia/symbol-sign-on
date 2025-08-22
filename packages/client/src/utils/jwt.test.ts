@@ -52,8 +52,11 @@ describe('JWTユーティリティ', () => {
     const result = await verifyAndRevokeJWT(invalidToken)
     expect(result).toBeNull()
     expect(insertAccessTokenBlacklist).toHaveBeenCalledWith(
-      invalidToken,
-      expect.objectContaining({ jwt_id: invalidToken }),
+      expect.objectContaining({
+        access_token: invalidToken,
+        client_id: 'unknown',
+        revoked_at: expect.any(Date),
+      }),
     )
     expect(logger.error).toHaveBeenCalledWith('JWT verification error: Token invalid or expired')
     expect(logger.info).toHaveBeenCalledWith(`JWT ${invalidToken} added to blacklist`)

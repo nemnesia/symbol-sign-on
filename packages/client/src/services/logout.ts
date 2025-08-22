@@ -2,8 +2,8 @@
  * ログアウトサービス
  */
 import { Request, Response } from 'express'
-import { findRefreshToken, insertRefreshToken } from '../db/mongo.js'
-import { RefreshTokenDocument } from '../types/mongo.types.js'
+import { findSessionByRefreshToken, updateSession } from '../db/mongo.js'
+import { SessionDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 
 /**
@@ -21,44 +21,39 @@ export async function handleLogout(req: Request, res: Response): Promise<void> {
       return
     }
 
-    // リフレッシュトークンの取得
-    let refreshTokenDoc: RefreshTokenDocument | null = null
+    // セッション検索
+    let sessionDoc: SessionDocument | null = null
     try {
-      refreshTokenDoc = await findRefreshToken(refresh_token)
+      sessionDoc = await findSessionByRefreshToken(refresh_token)
     } catch (dbError) {
       logger.error(`Database query failed: ${(dbError as Error).message}`)
       res.status(500).json({ error: 'Database connection error' })
       return
     }
 
-    // リフレッシュトークンが存在しない場合は400エラー
-    if (!refreshTokenDoc) {
+    // セッションが存在しない場合は400エラー
+    if (!sessionDoc) {
       res.status(400).json({ error: 'Invalid refresh_token' })
       return
     }
 
-    // トークンが使用済みまたは取り消し済みの場合は400エラー
-    if (refreshTokenDoc.used || refreshTokenDoc.revoked) {
-      res.status(400).json({ error: 'Refresh token already used or revoked' })
+    // セッションが既に取り消し済みの場合は400エラー
+    if (sessionDoc.revoked) {
+      res.status(400).json({ error: 'Session already revoked' })
       return
     }
 
-    // リフレッシュトークンを取り消し
+    // セッションを無効化
     try {
-      const updatedRefreshToken: Omit<RefreshTokenDocument, 'createdAt' | 'expiresAt'> = {
-        refresh_token: refreshTokenDoc.refresh_token,
-        address: refreshTokenDoc.address,
-        publicKey: refreshTokenDoc.publicKey,
-        used: true,
-        used_at: new Date(),
-        revoked: false,
-      }
-      await insertRefreshToken(refresh_token, updatedRefreshToken)
+      await updateSession(sessionDoc.session_id, {
+        revoked: true,
+        revoked_at: new Date(),
+      })
     } catch (dbError) {
-      logger.error(`Failed to revoke token: ${(dbError as Error).message}`)
-      // トークン無効化失敗は致命的ではないので続行
+      logger.error(`Failed to revoke session: ${(dbError as Error).message}`)
+      // セッション無効化失敗は致命的ではないので続行
     }
-    res.json({ status: 'ok', message: 'refresh token revoked' })
+    res.json({ status: 'ok', message: 'session revoked' })
   } catch (err) {
     logger.error(`/oauth/logout error: ${(err as Error).message}`)
     res.status(500).json({ error: 'Internal server error' })

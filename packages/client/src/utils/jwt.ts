@@ -67,16 +67,18 @@ export async function verifyAndRevokeJWT(jwtId: string): Promise<JWTPayload | nu
 /**
  * アクセストークンをブラックリストに追加
  * @param jwtId JWT ID（アクセストークン）
+ * @param clientId クライアントID
  */
-function addBlacklistEntry(jwtId: string): void {
+function addBlacklistEntry(jwtId: string, clientId: string = 'unknown'): void {
   const accessTokenBlacklistDocument: Omit<
     AccessTokenBlacklistDocument,
-    'createdAt' | 'expiresAt'
+    'created_at' | 'updated_at' | 'expires_at'
   > = {
-    jwt_id: jwtId,
+    client_id: clientId,
+    access_token: jwtId,
     revoked_at: new Date(),
   }
   // ブラックリスト登録
-  insertAccessTokenBlacklist(jwtId, accessTokenBlacklistDocument)
+  insertAccessTokenBlacklist(accessTokenBlacklistDocument)
   logger.info(`JWT ${jwtId} added to blacklist`)
 }

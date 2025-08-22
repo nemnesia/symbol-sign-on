@@ -580,6 +580,55 @@ describe('mongo.tsのテスト', () => {
     expect(result).toEqual(mockBlacklistDoc)
   })
 
+  it('データ操作関数をテストする - findClient', async () => {
+    process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
+
+    const mockClientDoc = {
+      client_id: 'client123',
+      trusted_redirect_uri: 'https://example.com/callback',
+      app_name: 'Test App',
+      created_at: new Date(),
+      updated_at: new Date(),
+      expires_at: new Date(Date.now() + 3600000),
+    }
+
+    const mockClientsCollection = {
+      createIndex: vi.fn().mockResolvedValue('index'),
+      find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      findOne: vi.fn().mockResolvedValue(mockClientDoc),
+    }
+
+    mockCollection.mockImplementation(() => mockClientsCollection)
+
+    const { connectToMongo, findClient } = await import('./mongo.js')
+    await connectToMongo()
+
+    const result = await findClient('client123')
+
+    expect(mockClientsCollection.findOne).toHaveBeenCalledWith({ client_id: 'client123' })
+    expect(result).toEqual(mockClientDoc)
+  })
+
+  it('findClient - クライアントが見つからない場合はnullを返す', async () => {
+    process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
+
+    const mockClientsCollection = {
+      createIndex: vi.fn().mockResolvedValue('index'),
+      find: vi.fn().mockReturnValue({ toArray: vi.fn().mockResolvedValue([]) }),
+      findOne: vi.fn().mockResolvedValue(null),
+    }
+
+    mockCollection.mockImplementation(() => mockClientsCollection)
+
+    const { connectToMongo, findClient } = await import('./mongo.js')
+    await connectToMongo()
+
+    const result = await findClient('nonexistent-client')
+
+    expect(mockClientsCollection.findOne).toHaveBeenCalledWith({ client_id: 'nonexistent-client' })
+    expect(result).toBeNull()
+  })
+
   it('データ操作関数をテストする - getAllowedOriginsFromMongo', async () => {
     process.env.MONGODB_URI = 'mongodb://localhost:27017/test'
 

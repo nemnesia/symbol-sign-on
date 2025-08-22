@@ -215,6 +215,17 @@ export async function getAllowedOriginsFromMongo(): Promise<string[]> {
 }
 
 /**
+ * クライアントドキュメント取得
+ * @param clientId クライアントID
+ * @returns クライアントドキュメントまたはnull
+ */
+export async function findClient(clientId: string): Promise<ClientDocument | null> {
+  ensureMongoConnected()
+  const doc = await Clients.findOne({ client_id: clientId })
+  return doc || null
+}
+
+/**
  * チャレンジドキュメント登録
  * @param doc チャレンジドキュメント
  * @param expiresIn 有効期限（秒）

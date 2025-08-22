@@ -2,8 +2,8 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteChallenge, findChallenge, insertAuthCode } from '../db/mongo.js'
-import { ChallengeDocument } from '../types/mongo.types.js'
+import { deleteChallenge, findChallenge, findClient, insertAuthCode } from '../db/mongo.js'
+import { ChallengeDocument, ClientDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { handleVerifySignature } from './verify-signature.js'
 
@@ -55,9 +55,18 @@ describe('handleVerifySignature', () => {
   const mockChallengeDoc: ChallengeDocument = {
     challenge: 'test-challenge',
     client_id: 'test-client',
-    redirect_uri: 'https://example.com/callback',
-    createdAt: new Date(),
-    expiresAt: new Date(Date.now() + 3600000), // 1時間後
+    created_at: new Date(),
+    updated_at: new Date(),
+    expires_at: new Date(Date.now() + 3600000), // 1時間後
+  }
+
+  const mockClientDoc: ClientDocument = {
+    client_id: 'test-client',
+    trusted_redirect_uri: 'https://example.com/callback',
+    app_name: 'Test App',
+    created_at: new Date(),
+    updated_at: new Date(),
+    expires_at: new Date(Date.now() + 86400000), // 24時間後
   }
 
   const mockTransaction = {
@@ -104,6 +113,7 @@ describe('handleVerifySignature', () => {
     // 正しいJSON文字列のHEXエンコード
     const jsonString = JSON.stringify({
       challenge: 'test-challenge',
+      client_id: 'test-client',
       state: 'test-state',
       pkce_challenge: 'test-pkce',
       pkce_challenge_method: 'S256',
@@ -136,55 +146,37 @@ describe('handleVerifySignature', () => {
   })
 
   describe('正常系', () => {
-    it('有効なペイロードで認可コードを正常に発行する', async () => {
-      // redirect_uriがないChallengeDocを使用してJSONレスポンスをテスト
-      const challengeDocWithoutRedirect = {
-        challenge: 'test-challenge',
-        client_id: 'test-client',
-        redirect_uri: '', // 空のredirect_uri
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 3600000), // 1時間後
-      } // モックの設定
-      vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
+    it('有効なペイロードで認可コードを正常に発行し、リダイレクトする', async () => {
+      // モックの設定
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
-      expect(mockJson).toHaveBeenCalledWith({
-        code: 'test-auth-code-uuid',
-        expires_in: 120,
-      })
+      expect(findClient).toHaveBeenCalledWith('test-client')
       expect(insertAuthCode).toHaveBeenCalledWith(
-        'test-auth-code-uuid',
         {
+          client_id: 'test-client',
           auth_code: 'test-auth-code-uuid',
-          address: 'mock-address',
-          publicKey: 'mock-public-key',
+          symbol_address: 'mock-address',
+          symbol_public_key: 'mock-public-key',
           pkce_challenge: 'test-pkce',
           pkce_challenge_method: 'S256',
           used: false,
         },
         120,
       )
-      expect(deleteChallenge).toHaveBeenCalledWith('test-challenge')
-    })
-
-    it('redirect_uriがある場合はHTMLリダイレクトを返す', async () => {
-      // モックの設定
-      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
-      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
-      vi.mocked(deleteChallenge).mockResolvedValue(undefined)
-
-      await handleVerifySignature(mockReq as Request, mockRes as Response)
-
+      expect(deleteChallenge).toHaveBeenCalledWith('test-client', 'test-challenge')
       expect(mockRedirect).toHaveBeenCalled()
-      const redirectUrl = mockRedirect.mock.calls[0][1]
+      const redirectUrl = mockRedirect.mock.calls[0][0]
       expect(redirectUrl).toContain('https://example.com/callback?code=test-auth-code-uuid')
     })
 
     it('stateパラメータを正しくリダイレクトURLに含める', async () => {
       // モックの設定
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockResolvedValue(undefined)
@@ -192,11 +184,8 @@ describe('handleVerifySignature', () => {
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(mockRedirect).toHaveBeenCalled()
-      const redirectUrl = mockRedirect.mock.calls[0][1]
+      const redirectUrl = mockRedirect.mock.calls[0][0]
       expect(redirectUrl).toContain('state=test-state')
-      expect(logger.debug).toHaveBeenCalledWith(
-        'Including state parameter in redirect (value omitted)',
-      )
     })
   })
 
@@ -276,6 +265,7 @@ describe('handleVerifySignature', () => {
 
     it('challengeが存在しない場合は400エラーを返す', async () => {
       const jsonString = JSON.stringify({
+        client_id: 'test-client',
         state: 'test-state',
         // challengeを省略
       })
@@ -295,6 +285,7 @@ describe('handleVerifySignature', () => {
     })
 
     it('チャレンジが存在しない場合は400エラーを返す', async () => {
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(null)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
@@ -302,20 +293,41 @@ describe('handleVerifySignature', () => {
       expect(mockStatus).toHaveBeenCalledWith(400)
       expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid or expired challenge' })
     })
+
+    it('クライアントが存在しない場合は400エラーを返す', async () => {
+      vi.mocked(findClient).mockResolvedValue(null)
+
+      await handleVerifySignature(mockReq as Request, mockRes as Response)
+
+      expect(mockStatus).toHaveBeenCalledWith(400)
+      expect(mockJson).toHaveBeenCalledWith({ error: 'Invalid client_id' })
+    })
   })
 
   describe('エラーハンドリング', () => {
-    it('Redis取得エラーの場合は500エラーを返す', async () => {
-      vi.mocked(findChallenge).mockRejectedValue(new Error('Redis connection failed'))
+    it('クライアント取得エラーの場合は500エラーを返す', async () => {
+      vi.mocked(findClient).mockRejectedValue(new Error('Database connection failed'))
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(mockStatus).toHaveBeenCalledWith(500)
       expect(mockJson).toHaveBeenCalledWith({ error: 'Database connection error' })
-      expect(logger.error).toHaveBeenCalledWith('Database query failed: Redis connection failed')
+      expect(logger.error).toHaveBeenCalledWith('Failed to get client: Database connection failed')
+    })
+
+    it('チャレンジ取得エラーの場合は500エラーを返す', async () => {
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
+      vi.mocked(findChallenge).mockRejectedValue(new Error('Database connection failed'))
+
+      await handleVerifySignature(mockReq as Request, mockRes as Response)
+
+      expect(mockStatus).toHaveBeenCalledWith(500)
+      expect(mockJson).toHaveBeenCalledWith({ error: 'Database connection error' })
+      expect(logger.error).toHaveBeenCalledWith('Database query failed: Database connection failed')
     })
 
     it('認可コード保存エラーの場合は500エラーを返す', async () => {
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockRejectedValue(new Error('Database save failed'))
 
@@ -327,15 +339,8 @@ describe('handleVerifySignature', () => {
     })
 
     it('チャレンジ削除エラーは継続処理される', async () => {
-      const challengeDocWithoutRedirect = {
-        challenge: 'test-challenge',
-        client_id: 'test-client',
-        redirect_uri: '', // JSONレスポンス用
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 3600000), // 1時間後
-      }
-
-      vi.mocked(findChallenge).mockResolvedValue(challengeDocWithoutRedirect)
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
       vi.mocked(deleteChallenge).mockRejectedValue(new Error('Delete failed'))
 
@@ -344,29 +349,8 @@ describe('handleVerifySignature', () => {
       expect(logger.error).toHaveBeenCalledWith(
         'Failed to delete challenge from database: Delete failed',
       )
-      // レスポンスは正常に返される
-      expect(mockJson).toHaveBeenCalledWith({
-        code: 'test-auth-code-uuid',
-        expires_in: 120,
-      })
-    })
-
-    it('無効なredirect_uriの場合はJSONレスポンスにフォールバックする', async () => {
-      const invalidRedirectDoc = {
-        ...mockChallengeDoc,
-        redirect_uri: 'invalid-url',
-      }
-      vi.mocked(findChallenge).mockResolvedValue(invalidRedirectDoc)
-      vi.mocked(insertAuthCode).mockResolvedValue(undefined)
-      vi.mocked(deleteChallenge).mockResolvedValue(undefined)
-
-      await handleVerifySignature(mockReq as Request, mockRes as Response)
-
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Invalid redirect_uri:'))
-      expect(mockJson).toHaveBeenCalledWith({
-        code: 'test-auth-code-uuid',
-        expires_in: 120,
-      })
+      // リダイレクトは正常に実行される
+      expect(mockRedirect).toHaveBeenCalled()
     })
 
     it('予期しないエラーの場合は500エラーを返す', async () => {
@@ -380,11 +364,12 @@ describe('handleVerifySignature', () => {
         },
       }
 
-      // 全てのモックを正常に設定してから、最後のsetAuthCodeで例外を発生
+      // 全てのモックを正常に設定してから、最後のinsertAuthCodeで例外を発生
       vi.mocked(SymbolTransactionFactory.deserialize).mockReturnValue(mockTransaction as any)
       vi.mocked(SymbolFacade).mockImplementation(() => mockFacade as any)
       const jsonString = JSON.stringify({
         challenge: 'test-challenge',
+        client_id: 'test-client',
         state: 'test-state',
       })
       const hexString =
@@ -394,6 +379,7 @@ describe('handleVerifySignature', () => {
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
 
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockRejectedValue(new Error('Unexpected error'))
 
@@ -407,17 +393,23 @@ describe('handleVerifySignature', () => {
 
   describe('XSS対策', () => {
     it('HTMLレスポンス内でURLが適切にエスケープされる', async () => {
-      const xssChallengeDoc = {
-        ...mockChallengeDoc,
-        redirect_uri: 'https://example.com/callback?param=<script>alert("xss")</script>',
+      const xssClientDoc: ClientDocument = {
+        client_id: 'test-client',
+        trusted_redirect_uri: 'https://example.com/callback?param=<script>alert("xss")</script>',
+        app_name: 'Test App',
+        created_at: new Date(),
+        updated_at: new Date(),
+        expires_at: new Date(Date.now() + 86400000),
       }
-      vi.mocked(findChallenge).mockResolvedValue(xssChallengeDoc)
+      vi.mocked(findClient).mockResolvedValue(xssClientDoc)
+      vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
+      vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(mockRedirect).toHaveBeenCalled()
-      const redirectUrl = mockRedirect.mock.calls[0][1]
+      const redirectUrl = mockRedirect.mock.calls[0][0]
       // URLエンコードされた文字列が含まれることを確認（ブラウザのURL API）
       expect(redirectUrl).not.toContain('<script>alert')
       expect(redirectUrl).not.toContain('"xss"')
@@ -428,6 +420,7 @@ describe('handleVerifySignature', () => {
     it('stateパラメータが存在しない場合は含めない', async () => {
       const jsonString = JSON.stringify({
         challenge: 'test-challenge',
+        client_id: 'test-client',
         // stateを省略
       })
       const hexString =
@@ -436,22 +429,22 @@ describe('handleVerifySignature', () => {
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
+      vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(mockRedirect).toHaveBeenCalled()
-      const redirectUrl = mockRedirect.mock.calls[0][1]
+      const redirectUrl = mockRedirect.mock.calls[0][0]
       expect(redirectUrl).not.toContain('state=')
-      expect(logger.debug).not.toHaveBeenCalledWith(
-        'Including state parameter in redirect (value omitted)',
-      )
     })
 
-    it.skip('pkce_challengeとpkce_challenge_methodが省略可能', async () => {
+    it('pkce_challengeとpkce_challenge_methodが省略可能', async () => {
       const jsonString = JSON.stringify({
-        code_challenge: 'test-challenge',
+        challenge: 'test-challenge',
+        client_id: 'test-client',
         state: 'test-state',
         // pkce関連を省略
       })
@@ -461,13 +454,14 @@ describe('handleVerifySignature', () => {
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
       vi.mocked(utils.uint8ToHex).mockReturnValue(hexString)
+      vi.mocked(findClient).mockResolvedValue(mockClientDoc)
       vi.mocked(findChallenge).mockResolvedValue(mockChallengeDoc)
       vi.mocked(insertAuthCode).mockResolvedValue(undefined)
+      vi.mocked(deleteChallenge).mockResolvedValue(undefined)
 
       await handleVerifySignature(mockReq as Request, mockRes as Response)
 
       expect(insertAuthCode).toHaveBeenCalledWith(
-        'test-auth-code-uuid',
         expect.objectContaining({
           pkce_challenge: undefined,
           pkce_challenge_method: undefined,

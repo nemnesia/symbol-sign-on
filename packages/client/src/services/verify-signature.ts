@@ -10,8 +10,8 @@ import { Request, Response } from 'express'
 import { utils } from 'symbol-sdk'
 import { models, SymbolFacade, SymbolTransactionFactory } from 'symbol-sdk/symbol'
 import { v4 as uuidv4 } from 'uuid'
-import { deleteChallenge, findChallenge, insertAuthCode } from '../db/mongo.js'
-import { AuthCodeDocument, ChallengeDocument } from '../types/mongo.types.js'
+import { deleteChallenge, findChallenge, findClient, insertAuthCode } from '../db/mongo.js'
+import { AuthCodeDocument, ChallengeDocument, ClientDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
 import { parseTimeToSeconds } from '../utils/time.js'
 
@@ -27,6 +27,7 @@ const SYMBOL_NETWORK_TYPE = process.env.SYMBOL_NETWORK_TYPE || 'testnet'
 
 // 型定義
 interface SignatureParams {
+  clientId: string
   publicKey: string
   address: string
   challenge: string
@@ -42,36 +43,6 @@ interface SignatureParams {
  * @param res Expressレスポンス
  */
 export async function handleVerifySignature(req: Request, res: Response): Promise<void> {
-  // プリフライトリクエスト（OPTIONS）の処理
-  if (req.method === 'OPTIONS') {
-    // チャレンジからredirect_uriを取得してCORS設定
-    try {
-      const { payload } = req.body
-      if (payload) {
-        const signatureParams = verifySignature(payload)
-        const challengeDoc = await findChallenge(signatureParams.challenge)
-        if (challengeDoc?.redirect_uri) {
-          const redirectUrl = new URL(challengeDoc.redirect_uri)
-          const allowedOrigin = `${redirectUrl.protocol}//${redirectUrl.host}`
-
-          const requestOrigin = req.headers.origin
-          if (requestOrigin === allowedOrigin) {
-            res.setHeader('Access-Control-Allow-Origin', requestOrigin)
-            res.setHeader('Access-Control-Allow-Credentials', 'true')
-          }
-        }
-      }
-    } catch {
-      // エラーの場合はデフォルトのCORS設定
-      logger.debug('CORS preflight: using default settings due to error')
-    }
-
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-    res.status(204).end()
-    return
-  }
-
   try {
     const { payload } = req.body
 
@@ -91,10 +62,25 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
       return
     }
 
+    // クライアント情報の取得（リダイレクトURL確認のため）
+    let clientDoc: ClientDocument | null
+    try {
+      clientDoc = await findClient(signatureParams.clientId)
+    } catch (dbError) {
+      logger.error(`Failed to get client: ${(dbError as Error).message}`)
+      res.status(500).json({ error: 'Database connection error' })
+      return
+    }
+
+    if (!clientDoc) {
+      res.status(400).json({ error: 'Invalid client_id' })
+      return
+    }
+
     // チャレンジ有効性チェック
     let challengeDoc: ChallengeDocument | null
     try {
-      challengeDoc = await findChallenge(signatureParams.challenge)
+      challengeDoc = await findChallenge(signatureParams.clientId, signatureParams.challenge)
     } catch (dbError) {
       logger.error(`Database query failed: ${(dbError as Error).message}`)
       res.status(500).json({ error: 'Database connection error' })
@@ -106,35 +92,20 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
       return
     }
 
-    // リダイレクトURLからオリジンを取得してCORS設定
-    if (challengeDoc.redirect_uri) {
-      try {
-        const redirectUrl = new URL(challengeDoc.redirect_uri)
-        const allowedOrigin = `${redirectUrl.protocol}//${redirectUrl.host}`
-
-        const requestOrigin = req.headers.origin
-        if (requestOrigin === allowedOrigin) {
-          res.setHeader('Access-Control-Allow-Origin', requestOrigin)
-          res.setHeader('Access-Control-Allow-Credentials', 'true')
-        }
-      } catch (corsError) {
-        logger.debug(`CORS setup failed: ${(corsError as Error).message}`)
-      }
-    }
-
     // 認可コード発行
     const authCode = uuidv4()
     try {
       // 型定義に合わせて作成
-      const authCodeData: Omit<AuthCodeDocument, 'createdAt' | 'expiresAt'> = {
+      const authCodeData: Omit<AuthCodeDocument, 'created_at' | 'updated_at' | 'expires_at'> = {
+        client_id: signatureParams.clientId,
         auth_code: authCode,
-        address: signatureParams.address,
-        publicKey: signatureParams.publicKey,
+        symbol_address: signatureParams.address,
+        symbol_public_key: signatureParams.publicKey,
         pkce_challenge: signatureParams.pkce_challenge,
         pkce_challenge_method: signatureParams.pkce_challenge_method,
         used: false,
       }
-      await insertAuthCode(authCode, authCodeData, AUTHCODE_EXPIRATION)
+      await insertAuthCode(authCodeData, AUTHCODE_EXPIRATION)
     } catch (dbError) {
       logger.error(`Failed to store auth code: ${(dbError as Error).message}`)
       res.status(500).json({ error: 'Database connection error' })
@@ -143,38 +114,23 @@ export async function handleVerifySignature(req: Request, res: Response): Promis
 
     // チャレンジを削除
     try {
-      await deleteChallenge(signatureParams.challenge)
+      await deleteChallenge(signatureParams.clientId, signatureParams.challenge)
     } catch (dbError) {
       logger.error(`Failed to delete challenge from database: ${(dbError as Error).message}`)
       // チャレンジ削除失敗は致命的ではないので続行
     }
 
-    // OAuth2準拠: 認可コードをredirect_uriに返す
-    if (challengeDoc.redirect_uri) {
-      try {
-        const redirectUrl = new URL(challengeDoc.redirect_uri)
-        redirectUrl.searchParams.set('code', authCode)
+    // OAuth2準拠: 認可コードをリダイレクトURLに含めてリダイレクト
+    const redirectUrl = new URL(clientDoc.trusted_redirect_uri)
+    redirectUrl.searchParams.append('code', authCode)
 
-        // stateパラメータがある場合は引き継ぐ（CSRF対策）
-        if (signatureParams.state) {
-          redirectUrl.searchParams.set('state', signatureParams.state)
-          logger.debug(`Including state parameter in redirect (value omitted)`)
-        }
-
-        // ポップアップ対応は廃止。通常リダイレクトのみ。
-        const safeRedirectUrl = redirectUrl.toString()
-
-        // HTTPリダイレクト（302）でサーバー側リダイレクトを実行
-        res.redirect(302, safeRedirectUrl)
-        return
-      } catch (redirectError) {
-        logger.error(`Invalid redirect_uri: ${(redirectError as Error).message}`)
-        // redirect_uriが無効な場合はJSONレスポンスにフォールバック
-      }
+    // stateパラメータがある場合は追加
+    if (signatureParams.state) {
+      redirectUrl.searchParams.append('state', signatureParams.state)
     }
 
-    // フォールバック: JSONレスポンス（OAuth2準拠ではないが、APIクライアント用）
-    res.json({ code: authCode, expires_in: AUTHCODE_EXPIRATION })
+    // 302リダイレクトでクライアントに認可コードを返す
+    res.redirect(redirectUrl.toString())
   } catch (err) {
     logger.error(`/oauth/verify-signature error: ${(err as Error).message}`)
     res.status(500).json({ error: 'Internal server error' })
@@ -206,6 +162,7 @@ function verifySignature(payload: string): SignatureParams {
   const publicKey = tx.signerPublicKey.toString()
   const address = facade.createPublicAccount(tx.signerPublicKey).address.toString()
 
+  let clientId = ''
   let challenge = ''
   let state: string | undefined = undefined
   let pkce_challenge: string | undefined = undefined
@@ -232,7 +189,7 @@ function verifySignature(payload: string): SignatureParams {
         if (!messageJson.challenge) {
           throw new Error('Missing challenge in transaction message')
         }
-
+        clientId = messageJson.client_id
         challenge = messageJson.challenge
         state = messageJson.state || undefined
         pkce_challenge = messageJson.pkce_challenge
@@ -248,6 +205,7 @@ function verifySignature(payload: string): SignatureParams {
   }
 
   return {
+    clientId,
     publicKey,
     address,
     challenge,

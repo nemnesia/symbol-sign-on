@@ -17,6 +17,7 @@ export default [
         navigator: 'readonly',
         global: 'readonly',
         document: 'readonly',
+        crypto: 'readonly',
       },
     },
     plugins: {

@@ -4,20 +4,23 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --preserve-symlinks",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --preserve-symlinks",
     "lint": "yarn eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\"",
     "lint:fix": "yarn eslint \"{src,apps,libs,test}/**/*.{ts,tsx}\" --fix",
     "format": "yarn prettier --check \"src/**/*.{ts,tsx}\"",
     "format:fix": "yarn prettier --write \"src/**/*.{ts,tsx}\""
   },
   "dependencies": {
+    "alice-cookie": "^0.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.0",
-    "sso-module": "file:../module",
-    "sss-module": "^1.0.4"
+    "sso-module": "portal:../module",
+    "sss-module": "^1.0.4",
+    "uuid": "^11.1.0",
+    "vite-plugin-node-polyfills": "^0.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

@@ -1,9 +1,20 @@
+import { aliceGetResponseGet, aliceRequestSignTransaction, type AliceSignTxResponse } from 'alice-cookie'
 import { useEffect, useState } from 'react'
-import { createSignTx, getChallenge, isMobileDevice, verifySignature, type ChallengeRequest } from 'sso-module'
+import {
+  createMessageJson,
+  createPkce,
+  createSignTx,
+  createState,
+  getChallenge,
+  isMobileDevice,
+  verifySignature,
+  type ChallengeRequest,
+} from 'sso-module'
 import { requestSign, requestSSS, setTransactionByPayload } from 'sss-module'
 import symbolLogo from '../assets/Symbol_Logo_primary_light_BG.svg'
 
-const SSO_BASE_URL = 'http://localhost:3510'
+const CLIENT_ID = 'demoapp2'
+const SSO_BASE_URL = 'http://172.19.250.241:3510'
 
 function Login() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -16,9 +27,27 @@ function Login() {
      * URLからパラメータを取得
      **************************************/
 
+    if (isMobileDevice()) {
+      // モバイルデバイスの場合は、URLに署名済txが含まれるので取得しておく
+    }
+
     const params = new URLSearchParams(window.location.search)
     const code = params.get('code')
     const state = params.get('state')
+    const signedPayload = params.get('signed_payload')
+
+    if (signedPayload) {
+      // TODO セッションが切れる
+      // aLiceの場合
+      const aliceResponse = aliceGetResponseGet() as AliceSignTxResponse
+      try {
+        verifySignature(aliceResponse.signedPayload, SSO_BASE_URL)
+      } catch (error) {
+        console.error('Unexpected error: Failed to send:', error)
+        setErrorMessage('Unexpected error: Failed to send')
+      }
+      return
+    }
 
     // codeがない場合は終了
     if (code === null) {
@@ -28,6 +57,7 @@ function Login() {
 
     // stateが異なる場合は終了
     if (state !== null && state !== sessionStorage.getItem('sso_state')) {
+      console.debug('Invalid state:', state, sessionStorage.getItem('sso_state'))
       console.error('Invalid state')
       setErrorMessage('Invalid state')
       return
@@ -47,11 +77,12 @@ function Login() {
   }, [])
 
   const accessToken = async (code: string) => {
+    console.log('アクセストークン取得:', code)
     /**************************************
      * アクセストークン取得
      **************************************/
 
-    const response = await fetch('http://localhost:3510/oauth/token', {
+    const response = await fetch('http://172.19.250.241:3510/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +91,7 @@ function Login() {
       body: JSON.stringify({
         grant_type: 'authorization_code',
         code: code,
-        client_id: 'demoapp',
+        client_id: CLIENT_ID,
         code_verifier: sessionStorage.getItem('sso_code_verifier'),
       }),
     })
@@ -86,7 +117,9 @@ function Login() {
   }
 
   const refreshToken = async () => {
-    const response = await fetch('http://localhost:3510/oauth/token', {
+    console.log('リフレッシュトークン取得')
+
+    const response = await fetch('http://172.19.250.241:3510/oauth/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +127,7 @@ function Login() {
       credentials: 'include',
       body: JSON.stringify({
         grant_type: 'refresh_token',
-        client_id: 'demoapp',
+        client_id: CLIENT_ID,
       }),
     })
 
@@ -119,6 +152,8 @@ function Login() {
   }
 
   const handleLogin = async () => {
+    console.log('ログインボタンがクリックされました')
+
     // エラーメッセージエリア初期化
     setErrorMessage(null)
 
@@ -128,10 +163,11 @@ function Login() {
 
     // チャレンジ取得
     const challengeRequest: ChallengeRequest = {
-      client_id: 'demoapp',
-      redirect_uri: 'http://localhost:5173/login',
+      client_id: CLIENT_ID,
+      redirect_uri: 'http://172.19.250.241:5173/login',
     }
     const challengeResponse = await getChallenge(challengeRequest, SSO_BASE_URL)
+    console.debug('チャレンジレスポンス:', challengeResponse)
 
     // エラーがある場合はメッセージを表示
     if (challengeResponse.error) {
@@ -146,52 +182,14 @@ function Login() {
      **************************************/
 
     // State生成(認可コードと一緒に返ってくる値と比較する)
-    const state = crypto.randomUUID()
+    const state = createState()
 
     /**************************************
      * PKCE生成
      **************************************/
 
     // PKCEを生成(アクセストークンを取得するときに必要)
-    const codeVerifier = crypto.randomUUID()
-    const encoder = new TextEncoder()
-    const data = encoder.encode(codeVerifier)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const codeChallenge = btoa(String.fromCharCode(...hashArray))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '')
-
-    /**************************************
-     * Symbol 転送トランザクション作成
-     **************************************/
-
-    const messageJson = {
-      challenge,
-      state,
-      pkce_challenge: codeChallenge,
-      pkce_challenge_method: 'S256', // SHA-256のみ対応
-    }
-    const message = '\0' + JSON.stringify(messageJson)
-    const unsignedTxHex = createSignTx('testnet', message)
-
-    /**************************************
-     * Symbol 転送トランザクション署名
-     **************************************/
-
-    // 署名
-    let signedTxJson = undefined
-    if (isMobileDevice()) {
-      console.debug('モバイルデバイスでの処理を実行')
-    } else {
-      console.debug('デスクトップデバイスでの処理を実行')
-      if (requestSSS()) {
-        setTransactionByPayload(unsignedTxHex)
-        signedTxJson = await requestSign()
-        console.debug('署名されたトランザクション:', signedTxJson.payload)
-      }
-    }
+    const { codeVerifier, codeChallenge } = await createPkce()
 
     /**************************************
      * セッションストレージに保存
@@ -200,6 +198,45 @@ function Login() {
     // StateとPKCEをセッションストレージに保存
     sessionStorage.setItem('sso_state', state)
     sessionStorage.setItem('sso_code_verifier', codeVerifier)
+
+    /**************************************
+     * Symbol 転送トランザクション作成
+     **************************************/
+
+    const messageJson = createMessageJson(CLIENT_ID, challenge!, state, codeChallenge)
+    const unsignedTxHex = createSignTx('testnet', messageJson)
+
+    console.debug('メッセージJSON:', messageJson)
+    console.debug('署名されていないトランザクション:', unsignedTxHex)
+
+    /**************************************
+     * Symbol 転送トランザクション署名
+     **************************************/
+
+    const hexToUint8 = (hex: string): Uint8Array => {
+      if (hex.length === 0) return new Uint8Array()
+      return new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)))
+    }
+
+    // 署名
+    let signedTxJson = undefined
+    if (isMobileDevice()) {
+      console.debug('モバイルデバイスでの処理を実行')
+      const currentUrl = window.location.href
+      console.debug('Current URL:', currentUrl)
+      await aliceRequestSignTransaction({
+        serializedTransaction: hexToUint8(unsignedTxHex),
+        callbackUrl: currentUrl,
+        method: 'get',
+      })
+    } else {
+      console.debug('デスクトップデバイスでの処理を実行')
+      if (requestSSS()) {
+        setTransactionByPayload(unsignedTxHex)
+        signedTxJson = await requestSign()
+        console.debug('署名されたトランザクション:', signedTxJson.payload)
+      }
+    }
 
     /**************************************
      * 署名済みトランザクションを送信
@@ -218,8 +255,10 @@ function Login() {
 
   return (
     <div style={{ textAlign: 'center', marginTop: '50px' }}>
-      <h1>Symbol Sign On</h1>
-      <img src={symbolLogo} className="logo react" alt="Symbol logo" />
+      <h2>Symbol Sign On</h2>
+      <div>
+        <img src={symbolLogo} className="logo react" alt="Symbol logo" />
+      </div>
       {errorMessage && <div style={{ color: 'red', marginBottom: '20px' }}>{errorMessage}</div>}
       <button onClick={handleLogin} style={{ padding: '10px 20px', fontSize: '16px' }}>
         Symbol Sign

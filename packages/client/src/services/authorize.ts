@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { Clients, insertChallenge } from '../db/mongo.js'
 import { ChallengeDocument } from '../types/mongo.types.js'
 import logger from '../utils/logger.js'
+import { checkAuthorizeRateLimit } from '../middleware/rateLimiter.js'
 
 // 定数定義
 const CHALLENGE_EXPIRES_IN = 300 // 5分
@@ -28,7 +29,20 @@ const SUPPORTED_RESPONSE_TYPES = ['code'] as const
  * @param res Expressレスポンス
  */
 export async function handleAuthorize(req: Request, res: Response): Promise<void> {
+  // セキュリティ上の理由により、最小限のログのみ記録
+  logger.info('OAuth authorize request received', {
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString()
+  })
+
   try {
+    // レート制限チェック
+    const rateLimitCheck = checkAuthorizeRateLimit(req)
+    if (!rateLimitCheck.allowed) {
+      res.status(429).json(rateLimitCheck.error)
+      return
+    }
     // パラメータ検証
     const validationResult = validateAuthorizeParams(req.query)
     if (!validationResult.valid) {
@@ -73,12 +87,16 @@ export async function handleAuthorize(req: Request, res: Response): Promise<void
       await insertChallenge(challengeDoc, CHALLENGE_EXPIRES_IN)
     } catch (err) {
       // Mongo保存エラー
+      const errorMessage = process.env.NODE_ENV === 'production'
+        ? 'Database error occurred'
+        : `Database error while inserting challenge: ${(err as Error).message}`
+
       handleError(
         res,
         500,
         'server_error',
         'Database error',
-        `/oauth/authorize Database error while inserting challenge: client_id=${client_id}, redirect_uri=${redirect_uri}, error=${(err as Error).stack || (err as Error).message}`,
+        `/oauth/authorize ${errorMessage}: client_id=${client_id}`,
       )
       return
     }
@@ -176,6 +194,15 @@ export function validateAuthorizeParams(
     }
   }
 
+  // client_idの形式チェック（UUIDまたは英数字のみ）
+  if (!/^[a-zA-Z0-9_-]+$/.test(clientId) || clientId.length > 128) {
+    return {
+      valid: false,
+      errorCode: 'invalid_client',
+      message: 'client_id format is invalid',
+    }
+  }
+
   // redirect_uri の強化されたURL形式チェック
   if (!isValidRedirectUri(redirectUri)) {
     return {
@@ -207,7 +234,10 @@ function isValidRedirectUri(uri: string): boolean {
     }
 
     // localhost以外のHTTPを拒否（開発環境考慮）
-    if (url.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(url.hostname)) {
+    if (
+      url.protocol === 'http:' &&
+      !['localhost', '127.0.0.1', '172.19.250.241'].includes(url.hostname)
+    ) {
       return false
     }
 
@@ -251,13 +281,17 @@ async function validateClient(
     }
 
     // redirect_uriが登録済みURIと完全一致するか検証（セキュリティ強化）
-    if (!client.trusted_redirect_uri.includes(redirectUri)) {
+    const trustedUris = Array.isArray(client.trusted_redirect_uri)
+      ? client.trusted_redirect_uri
+      : [client.trusted_redirect_uri]
+
+    if (!trustedUris.some(uri => uri === redirectUri)) {
       return {
         valid: false,
         statusCode: 400,
         errorCode: 'invalid_request',
         message: 'redirect_uri does not match any trusted URI',
-        logMessage: `/oauth/authorize redirect_uri does not match any trusted URI: ${redirectUri}`,
+        logMessage: `/oauth/authorize redirect_uri does not match any trusted URI for client: ${clientId}`,
       }
     }
 

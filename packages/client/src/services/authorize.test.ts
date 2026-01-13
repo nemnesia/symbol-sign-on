@@ -18,6 +18,7 @@ vi.mock('../utils/logger.js', () => ({
     info: vi.fn(),
     debug: vi.fn(),
     warn: vi.fn(),
+    silly: vi.fn(),
   },
 }))
 vi.mock('uuid', () => ({

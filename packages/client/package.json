@@ -2,10 +2,10 @@
   "name": "symbol-sign-on-client",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "dev:watch": "tsx watch src/index.ts",
+    "dev": "tsx --preserve-symlinks src/index.ts",
+    "dev:watch": "tsx --preserve-symlinks watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --preserve-symlinks dist/index.js",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
@@ -19,6 +19,7 @@
     "format:fix": "prettier --write \"src/**/*.{ts,js,json}\""
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
     "@types/jsonwebtoken": "^9.0.10",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -57,6 +58,6 @@
   "volta": {
     "node": "24.4.1",
     "npm": "11.4.2",
-    "yarn": "4.9.2"
+    "yarn": "4.9.3"
   }
 }

@@ -3844,6 +3844,7 @@ __metadata:
     rollup-plugin-visualizer: "npm:^6.0.3"
     tslib: "npm:^2.8.1"
     typescript: "npm:^5.9.2"
+    uuid: "npm:^11.1.0"
     vitest: "npm:^3.2.4"
   languageName: unknown
   linkType: soft
@@ -4201,6 +4202,15 @@ __metadata:
   dependencies:
     punycode: "npm:^2.1.0"
   checksum: 10c0/4ef57b45aa820d7ac6496e9208559986c665e49447cb072744c13b66925a362d96dd5a46c4530a6b8e203e5db5fe849369444440cb22ecfc26c679359e5dfa3c
+  languageName: node
+  linkType: hard
+
+"uuid@npm:^11.1.0":
+  version: 11.1.0
+  resolution: "uuid@npm:11.1.0"
+  bin:
+    uuid: dist/esm/bin/uuid
+  checksum: 10c0/34aa51b9874ae398c2b799c88a127701408cd581ee89ec3baa53509dd8728cbb25826f2a038f9465f8b7be446f0fbf11558862965b18d21c993684297628d4d3
   languageName: node
   linkType: hard
 

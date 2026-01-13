@@ -3,9 +3,9 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 // 必要なモジュールのインポート
-import express from 'express'
-import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import cors from 'cors'
+import express from 'express'
 import { connectToMongo, getAllowedOriginsFromMongo } from './db/mongo.js'
 import healthRoutes from './routes/health.js'
 import oauthRoutes from './routes/oauth.js'
@@ -14,7 +14,7 @@ import { parseTimeToSeconds } from './utils/time.js'
 
 // 定数の定義
 const app = express()
-const PORT = process.env.PORT || 3000
+const PORT = Number(process.env.PORT) || 3000
 const CACHE_TTL_MS = parseTimeToSeconds(process.env.CORS_ORIGINS_CACHE_TTL || '5m') * 1000 // CORS originキャッシュのTTL
 
 // 許可されたオリジンのキャッシュ
@@ -137,9 +137,13 @@ async function startServer(): Promise<void> {
 
     await getCachedAllowedOrigins()
     logger.info(`CORS origins cache initialized with base origin: ${process.env.CORS_ORIGIN}`)
-    logger.info(`CORS origins cache TTL: ${CACHE_TTL_MS / 1000}s (${process.env.CORS_ORIGINS_CACHE_TTL || '5m'})`)
+    logger.info(
+      `CORS origins cache TTL: ${CACHE_TTL_MS / 1000}s (${process.env.CORS_ORIGINS_CACHE_TTL || '5m'})`,
+    )
 
-    app.listen(PORT, () => {
+    const host = process.env.NODE_ENV === 'development' ? '0.0.0.0' : '127.0.0.1'
+
+    app.listen(PORT, host, () => {
       logger.info(`Server running on http://localhost:${PORT}`)
       logger.info(`API endpoints:`)
       logger.info(`  GET  /health - Health check`)

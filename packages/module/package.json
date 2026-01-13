@@ -15,8 +15,7 @@
   },
   "scripts": {
     "build": "rollup -c",
-    "build:cp": "yarn build && cp ./dist/symbol-sign-on.umd.js ../client/public/",
-    "demo": "node demo/demo-server.mjs",
+    "demo": "node --preserve-symlinks demo/demo-server.mjs",
     "lint": "yarn eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "yarn eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "format": "yarn prettier --check \"src/**/*.ts\"",
@@ -24,7 +23,8 @@
   },
   "packageManager": "yarn@4.9.2",
   "dependencies": {
-    "@noble/hashes": "^1.8.0"
+    "@noble/hashes": "^1.8.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.6",
@@ -54,6 +54,6 @@
   "volta": {
     "node": "24.4.1",
     "npm": "11.4.2",
-    "yarn": "4.9.2"
+    "yarn": "4.9.3"
   }
 }

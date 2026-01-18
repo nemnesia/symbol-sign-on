@@ -8,7 +8,7 @@ RFC 草案: Symbol Sign-On
 
 **ステータス:** Draft
 
-**作成者:** (To be filled)
+**作成者:** ccHarvestasya
 
 **目次**
 
@@ -36,7 +36,9 @@ Symbol のアドレスを DID 風の識別子（`did:symbol:<master-account-addr
 
 ## 仕様
 
-この節は実装者向けの最低限のルールを定義します。より詳細なメッセージフォーマット・SDK は別 RFC/ドキュメントで規定します。
+この節は実装者向けの最低限のルールを定義します。より詳細なメッセージフォーマット（署名対象の正規形）は別仕様で規定します。
+
+- メッセージフォーマット（Draft）: `docs/specs/auth-message-format.md`
 
 ### 識別子モデル
 
@@ -87,6 +89,7 @@ Symbol のアドレスを DID 風の識別子（`did:symbol:<master-account-addr
 設計上の注意:
 
 - 署名対象には常に `nonce + server_id + timestamp` を含めること。
+- 署名対象メッセージ（正規形）の詳細は `docs/specs/auth-message-format.md` に従うこと。
 - `POST /auth/verify` では受信した署名の一意性をサーバで記録し、再利用を拒否すること。
 - ペイロードの厳密なスキーマ（型、エラーコード、HTTP レスポンス詳細）は `docs/specs/auth-api.yaml` のような別ファイル（OpenAPI）で定義してください。
 
